@@ -57,6 +57,7 @@ function slugify(text: string): string {
 function generateWelcomeEmail(entities: GeneratedEntity[], domain: string): EmailTemplate {
   const appName = serviceName(domain);
   const entityName = primaryEntityName(entities);
+  const entityLower = entityName.toLowerCase();
   const subject = `Welcome to ${appName} — Let's get started! 🚀`;
 
   const html = `<!DOCTYPE html>
@@ -153,6 +154,7 @@ If you didn't create this account, please ignore this email.`;
 function generateStatusChangeEmail(entities: GeneratedEntity[], domain: string): EmailTemplate {
   const appName = serviceName(domain);
   const entityName = primaryEntityName(entities);
+  const entityLower = entityName.toLowerCase();
   const subject = `Your ${entityLower} status has been updated — {{newStatus}}`;
 
   const html = `<!DOCTYPE html>
