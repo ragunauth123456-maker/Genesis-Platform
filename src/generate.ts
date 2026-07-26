@@ -9,9 +9,11 @@
 
 import { generateDatabaseProject } from "./database-project";
 import { generateBackendProject } from "./backend-project";
+import { generateFrontendProject } from "./frontend-project";
 import type { BackendProject } from "./backend-project";
+import type { FrontendProject } from "./frontend-project";
 
-export type { BackendProject };
+export type { BackendProject, FrontendProject };
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +72,7 @@ export interface GenerationResult {
   apiRoutes: string;
   databaseProject?: DatabaseProject;
   backendProject?: BackendProject;
+  frontendProject?: FrontendProject;
 }
 
 // ── OpenAI generation (primary path) ────────────────────────────────────────
@@ -1831,8 +1834,9 @@ function attachSchemaArtifacts(result: GenerationResult): GenerationResult {
 
   const databaseProject = generateDatabaseProject(result.entities, relationships, sql);
   const backendProject = generateBackendProject(result.entities, result.endpoints, apiRoutes);
+  const frontendProject = generateFrontendProject(result.entities, result.components, result.endpoints);
 
-  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject };
+  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject };
 }
 
 // ── Main generation function ───────────────────────────────────────────────

@@ -118,7 +118,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -182,7 +182,9 @@ function Home() {
   const [dbExpandedSection, setDbExpandedSection] = useState<string>("docker");
   const [dbCopied, setDbCopied] = useState<string | null>(null);
   const [backendExpandedSection, setBackendExpandedSection] = useState<string>("structure");
+  const [frontendExpandedSection, setFrontendExpandedSection] = useState<string>("structure");
   const [backendCopied, setBackendCopied] = useState<string | null>(null);
+  const [frontendCopied, setFrontendCopied] = useState<string | null>(null);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -724,6 +726,7 @@ function Home() {
                     ...(demoResult.apiRoutes ? [["apiroutes", "API Routes"]] as [ResultTab, string][] : []),
                     ...(demoResult.databaseProject ? [["database", "Database"]] as [ResultTab, string][] : []),
                     ...(demoResult.backendProject ? [["backend", "Backend"]] as [ResultTab, string][] : []),
+                    ...(demoResult.frontendProject ? [["frontend", "Frontend"]] as [ResultTab, string][] : []),
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -1826,6 +1829,342 @@ function Home() {
                       <p className="text-xs text-surface-400 mt-0.5">
                         Hono • Bun • TypeScript • {demoResult.backendProject.middleware.length} middleware(s) •{" "}
                         Ready to run with <code className="text-brand-400">bun run dev</code>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab Content: Frontend */}
+              {activeTab === "frontend" && demoResult.frontendProject && (
+                <div className="space-y-4">
+                  {/* Sub-section selector */}
+                  <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/70 p-1 overflow-x-auto">
+                    {[
+                      ["structure", "📁 Structure"],
+                      ["components", "🧩 Components"],
+                      ["apptsx", "📄 App.tsx"],
+                      ["entry", "🚀 Entry Files"],
+                      ["config", "⚙️ Config"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setFrontendExpandedSection(key)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+                          frontendExpandedSection === key
+                            ? "bg-surface-800 text-white shadow-sm"
+                            : "text-surface-400 hover:text-surface-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Project Structure */}
+                  {frontendExpandedSection === "structure" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center gap-3 px-5 py-3 border-b border-white/5">
+                        <span className="text-lg">📁</span>
+                        <h3 className="text-sm font-semibold text-surface-200">
+                          Project Structure
+                        </h3>
+                        <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                          React + Vite + Tailwind
+                        </span>
+                      </div>
+                      <div className="p-5">
+                        <pre className="text-xs font-mono leading-relaxed text-surface-300 bg-surface-950/70 rounded-lg p-4 overflow-x-auto">
+                          <code>{`├── index.html                 # Vite HTML entry
+├── package.json               # Dependencies & scripts
+├── tsconfig.json              # TypeScript config
+├── tsconfig.node.json         # Node/Vite TS config
+├── vite.config.ts             # Vite + React plugin
+├── tailwind.config.js         # Tailwind CSS (dark theme)
+├── postcss.config.js          # PostCSS (Tailwind)
+└── src/
+    ├── index.tsx              # React entry point
+    ├── index.css              # Tailwind directives + theme
+    ├── App.tsx                # Root app component
+    ├── types.ts               # Generated TypeScript interfaces
+    └── components/
+${demoResult.components.map((c) => `        ├── ${c.name}.tsx`).join("\n")}`}</code>
+                        </pre>
+                      </div>
+                      <div className="flex items-center gap-3 rounded-b-xl border-t border-white/5 bg-brand-500/5 p-4">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500/10 text-sm">
+                          📦
+                        </span>
+                        <div>
+                          <h4 className="text-xs font-semibold text-brand-300">
+                            Complete React project — {demoResult.components.length} components
+                          </h4>
+                          <p className="text-[11px] text-surface-400 mt-0.5">
+                            <code className="text-brand-400">npm install && npm run dev</code> — starts Vite dev server on port 5173
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Component Files */}
+                  {frontendExpandedSection === "components" && (
+                    <div className="space-y-4">
+                      {demoResult.frontendProject.files
+                        .filter((f) => f.filename.startsWith("src/components/"))
+                        .map((file, i) => (
+                          <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                            <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                              <div className="flex items-center gap-3">
+                                <span className="text-lg">🧩</span>
+                                <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                                  {file.filename}
+                                </h3>
+                                <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                                  {file.content.split("\n").length} lines
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(file.content).then(() => {
+                                    setFrontendCopied(`comp-${i}`);
+                                    setTimeout(() => setFrontendCopied(null), 2000);
+                                  }).catch(() => {});
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                              >
+                                {frontendCopied === `comp-${i}` ? (
+                                  <>
+                                    <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Copied!
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    Copy
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                              <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                                <code>{file.content}</code>
+                              </pre>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* App.tsx */}
+                  {frontendExpandedSection === "apptsx" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">📄</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                            src/App.tsx
+                          </h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                            root component
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.frontendProject!.appTsx).then(() => {
+                              setFrontendCopied("apptsx");
+                              setTimeout(() => setFrontendCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {frontendCopied === "apptsx" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.frontendProject.appTsx}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Entry Files */}
+                  {frontendExpandedSection === "entry" && (
+                    <div className="space-y-4">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">🚀</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                              src/index.tsx
+                            </h3>
+                            <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                              ReactDOM entry
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.frontendProject!.indexTsx).then(() => {
+                                setFrontendCopied("indexTsx");
+                                setTimeout(() => setFrontendCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {frontendCopied === "indexTsx" ? (
+                              <>
+                                <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                          <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                            <code>{demoResult.frontendProject.indexTsx}</code>
+                          </pre>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">🌐</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                              index.html
+                            </h3>
+                            <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                              Vite entry
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.frontendProject!.indexHtml).then(() => {
+                                setFrontendCopied("indexHtml");
+                                setTimeout(() => setFrontendCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {frontendCopied === "indexHtml" ? (
+                              <>
+                                <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                          <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                            <code>{demoResult.frontendProject.indexHtml}</code>
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Config Files */}
+                  {frontendExpandedSection === "config" && (
+                    <div className="space-y-4">
+                      {demoResult.frontendProject.files
+                        .filter((f) => !f.filename.startsWith("src/"))
+                        .map((file, i) => (
+                          <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                            <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                              <div className="flex items-center gap-3">
+                                <span className="text-lg">⚙️</span>
+                                <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                                  {file.filename}
+                                </h3>
+                                <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                                  config
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(file.content).then(() => {
+                                    setFrontendCopied(`cfg-${i}`);
+                                    setTimeout(() => setFrontendCopied(null), 2000);
+                                  }).catch(() => {});
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                              >
+                                {frontendCopied === `cfg-${i}` ? (
+                                  <>
+                                    <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Copied!
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    Copy
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                            <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                              <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                                <code>{file.content}</code>
+                              </pre>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* Summary badge */}
+                  <div className="flex items-center gap-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-lg">
+                      🎨
+                    </span>
+                    <div>
+                      <h4 className="text-sm font-semibold text-cyan-300">
+                        Complete Frontend Project
+                      </h4>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        React • TypeScript • Tailwind CSS • Vite • {demoResult.frontendProject.files.length + 3} files •{" "}
+                        Ready to run with <code className="text-brand-400">npm run dev</code>
                       </p>
                     </div>
                   </div>
