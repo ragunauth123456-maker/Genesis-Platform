@@ -234,6 +234,18 @@ export async function generateProjectZip(
     zip.file(`${nRoot}/README.md`, buildNotificationsReadme(result));
   }
 
+  // ── Documentation ───────────────────────────────────────────────────────────────
+  if (result.documentationProject) {
+    const dp = result.documentationProject;
+    const docsRoot = `${projectRoot}/docs`;
+
+    zip.file(`${docsRoot}/openapi.json`, dp.openApiSpec);
+    zip.file(`${docsRoot}/api-reference.md`, dp.apiReference);
+    zip.file(`${docsRoot}/user-guide.md`, dp.userGuide);
+    zip.file(`${docsRoot}/developer-guide.md`, dp.developerGuide);
+    zip.file(`${projectRoot}/README.md`, dp.readme);
+  }
+
   // ── Also include SQL schema at root level for convenience ──────────────
   if (result.sql) {
     zip.file(`${projectRoot}/database/schema.sql`, result.sql);
@@ -315,6 +327,13 @@ function buildRootReadme(result: GenerationResult): string {
     lines.push("│   ├── permissions.ts       # Role → Entity → Actions permissions object");
     lines.push("│   ├── rbac-middleware.ts   # Hono middleware for JWT/API key role checking");
     lines.push("│   └── seed-roles.ts        # Idempotent seed script for default roles");
+  }
+  if (result.documentationProject) {
+    lines.push("├── docs/              # Generated documentation");
+    lines.push("│   ├── openapi.json           # OpenAPI 3.0.3 specification");
+    lines.push("│   ├── api-reference.md       # Complete REST API documentation");
+    lines.push("│   ├── user-guide.md          # Getting started and common workflows");
+    lines.push("│   └── developer-guide.md     # Architecture, setup, and extending");
   }
   if (result.notificationProject) {
     lines.push("├── notifications/    # Email templates, notification service, and UI component");

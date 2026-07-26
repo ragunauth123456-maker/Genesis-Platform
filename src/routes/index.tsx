@@ -129,7 +129,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows" | "reports" | "permissions" | "notifications";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows" | "reports" | "permissions" | "notifications" | "docs";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -208,6 +208,8 @@ function Home() {
   const [permissionsCopied, setPermissionsCopied] = useState<string | null>(null);
   const [notificationsExpandedSection, setNotificationsExpandedSection] = useState<string>("templates");
   const [notificationsCopied, setNotificationsCopied] = useState<string | null>(null);
+  const [docsExpandedSection, setDocsExpandedSection] = useState<string>("openapi");
+  const [docsCopied, setDocsCopied] = useState<string | null>(null);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -829,6 +831,7 @@ function Home() {
                     ...(demoResult.reportProject ? [["reports", "Reports 📊"]] as [ResultTab, string][] : []),
                     ...(demoResult.permissionProject ? [["permissions", "Permissions 🔐"]] as [ResultTab, string][] : []),
                     ...(demoResult.notificationProject ? [["notifications", "Notifications 🔔"]] as [ResultTab, string][] : []),
+                    ...(demoResult.documentationProject ? [["docs", "Docs 📚"]] as [ResultTab, string][] : []),
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -3764,6 +3767,210 @@ ${demoResult.components.map((c) => `        ├── ${c.name}.tsx`).join("\n")
                         <div className="px-5 py-3">
                           <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{(demoResult.notificationProject?.notificationStore || "").length > 3000 ? (demoResult.notificationProject?.notificationStore || "").slice(0, 3000) : (demoResult.notificationProject?.notificationStore || "")}</code></pre>
                         </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+
+
+              {/* Tab Content: Docs */}
+              {activeTab === "docs" && demoResult.documentationProject && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-lg">📚</span>
+                    <div>
+                      <h4 className="text-sm font-semibold text-emerald-300">Documentation</h4>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        OpenAPI 3.0 Spec &middot; API Reference &middot; User Guide &middot; Developer Guide &middot; README
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/70 p-1 overflow-x-auto">
+                    {[
+                      ["openapi", "📋 OpenAPI Spec"],
+                      ["apiref", "🔌 API Reference"],
+                      ["userguide", "📖 User Guide"],
+                      ["devguide", "🛠️ Developer Guide"],
+                      ["readme", "📝 README"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setDocsExpandedSection(key)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+                          docsExpandedSection === key
+                            ? "bg-surface-800 text-white shadow-sm"
+                            : "text-surface-400 hover:text-surface-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* OpenAPI Spec */}
+                  {docsExpandedSection === "openapi" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">📋</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">openapi.json</h3>
+                          <span className="text-[10px] font-medium text-green-500/70 uppercase tracking-wider bg-green-500/10 px-2 py-0.5 rounded">OpenAPI 3.0.3</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.documentationProject?.openApiSpec || "").then(() => {
+                              setDocsCopied("openapi");
+                              setTimeout(() => setDocsCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {docsCopied === "openapi" ? (
+                            <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                          ) : (
+                            <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{(demoResult.documentationProject?.openApiSpec || "").length > 8000 ? (demoResult.documentationProject?.openApiSpec || "").slice(0, 8000) + "\n\n... (truncated, click Copy for full spec)" : (demoResult.documentationProject?.openApiSpec || "")}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* API Reference */}
+                  {docsExpandedSection === "apiref" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🔌</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">api-reference.md</h3>
+                          <span className="text-[10px] font-medium text-blue-500/70 uppercase tracking-wider bg-blue-500/10 px-2 py-0.5 rounded">Markdown</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.documentationProject?.apiReference || "").then(() => {
+                              setDocsCopied("apiref");
+                              setTimeout(() => setDocsCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {docsCopied === "apiref" ? (
+                            <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                          ) : (
+                            <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto whitespace-pre-wrap">
+                          <code>{(demoResult.documentationProject?.apiReference || "").length > 8000 ? (demoResult.documentationProject?.apiReference || "").slice(0, 8000) + "\n\n... (truncated, click Copy for full docs)" : (demoResult.documentationProject?.apiReference || "")}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* User Guide */}
+                  {docsExpandedSection === "userguide" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">📖</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">user-guide.md</h3>
+                          <span className="text-[10px] font-medium text-purple-500/70 uppercase tracking-wider bg-purple-500/10 px-2 py-0.5 rounded">Markdown</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.documentationProject?.userGuide || "").then(() => {
+                              setDocsCopied("userguide");
+                              setTimeout(() => setDocsCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {docsCopied === "userguide" ? (
+                            <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                          ) : (
+                            <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto whitespace-pre-wrap">
+                          <code>{(demoResult.documentationProject?.userGuide || "").length > 8000 ? (demoResult.documentationProject?.userGuide || "").slice(0, 8000) + "\n\n... (truncated, click Copy for full docs)" : (demoResult.documentationProject?.userGuide || "")}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Developer Guide */}
+                  {docsExpandedSection === "devguide" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🛠️</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">developer-guide.md</h3>
+                          <span className="text-[10px] font-medium text-amber-500/70 uppercase tracking-wider bg-amber-500/10 px-2 py-0.5 rounded">Markdown</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.documentationProject?.developerGuide || "").then(() => {
+                              setDocsCopied("devguide");
+                              setTimeout(() => setDocsCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {docsCopied === "devguide" ? (
+                            <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                          ) : (
+                            <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto whitespace-pre-wrap">
+                          <code>{(demoResult.documentationProject?.developerGuide || "").length > 8000 ? (demoResult.documentationProject?.developerGuide || "").slice(0, 8000) + "\n\n... (truncated, click Copy for full docs)" : (demoResult.documentationProject?.developerGuide || "")}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* README */}
+                  {docsExpandedSection === "readme" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">📝</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">README.md</h3>
+                          <span className="text-[10px] font-medium text-pink-500/70 uppercase tracking-wider bg-pink-500/10 px-2 py-0.5 rounded">Markdown</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.documentationProject?.readme || "").then(() => {
+                              setDocsCopied("readme");
+                              setTimeout(() => setDocsCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {docsCopied === "readme" ? (
+                            <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                          ) : (
+                            <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto whitespace-pre-wrap">
+                          <code>{(demoResult.documentationProject?.readme || "").length > 8000 ? (demoResult.documentationProject?.readme || "").slice(0, 8000) + "\n\n... (truncated, click Copy for full README)" : (demoResult.documentationProject?.readme || "")}</code>
+                        </pre>
                       </div>
                     </div>
                   )}
