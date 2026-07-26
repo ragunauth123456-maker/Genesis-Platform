@@ -14,14 +14,16 @@ import { generateDashboard } from "./dashboard-generator";
 import { generateDeployment } from "./deployment-generator";
 import { generateWorkflows } from "./workflow-generator";
 import { generateReports, buildReportRunnerCode, buildScheduledConfigJSON } from "./report-generator";
+import { generatePermissions } from "./permission-generator";
 import type { BackendProject } from "./backend-project";
 import type { FrontendProject } from "./frontend-project";
 import type { DashboardProject } from "./dashboard-generator";
 import type { DeploymentProject } from "./deployment-generator";
 import type { WorkflowProject } from "./workflow-generator";
 import type { ReportProject } from "./report-generator";
+import type { PermissionProject } from "./permission-generator";
 
-export type { BackendProject, FrontendProject, DashboardProject, DeploymentProject, WorkflowProject, ReportProject };
+export type { BackendProject, FrontendProject, DashboardProject, DeploymentProject, WorkflowProject, ReportProject, PermissionProject };
 export { buildReportRunnerCode, buildScheduledConfigJSON };
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -88,6 +90,7 @@ export interface GenerationResult {
   reportProject?: ReportProject;
   reportRunner?: string;
   scheduledConfigJson?: string;
+  permissionProject?: PermissionProject;
 }
 
 // ── OpenAI generation (primary path) ────────────────────────────────────────
@@ -1858,8 +1861,9 @@ function attachSchemaArtifacts(result: GenerationResult): GenerationResult {
   const reportProject = generateReports(result.entities, result.endpoints, sql);
   const reportRunner = buildReportRunnerCode(reportProject);
   const scheduledConfigJson = buildScheduledConfigJSON(reportProject);
+  const permissionProject = generatePermissions(result.entities, result.endpoints, result.domain);
 
-  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject, deploymentProject, workflowProject, reportProject, reportRunner, scheduledConfigJson };
+  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject, deploymentProject, workflowProject, reportProject, reportRunner, scheduledConfigJson, permissionProject };
 }
 
 // ── Main generation function ───────────────────────────────────────────────

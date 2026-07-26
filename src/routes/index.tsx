@@ -129,7 +129,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows" | "reports";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows" | "reports" | "permissions";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -204,6 +204,8 @@ function Home() {
   const [workflowsCopied, setWorkflowsCopied] = useState<string | null>(null);
   const [reportsExpandedSection, setReportsExpandedSection] = useState<string>("summary");
   const [reportsCopied, setReportsCopied] = useState<string | null>(null);
+  const [permissionsExpandedSection, setPermissionsExpandedSection] = useState<string>("roles");
+  const [permissionsCopied, setPermissionsCopied] = useState<string | null>(null);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -823,6 +825,7 @@ function Home() {
                     ...(demoResult.deploymentProject ? [["deploy", "Deploy 🚀"]] as [ResultTab, string][] : []),
                     ...(demoResult.workflowProject ? [["workflows", "Workflows 🔄"]] as [ResultTab, string][] : []),
                     ...(demoResult.reportProject ? [["reports", "Reports 📊"]] as [ResultTab, string][] : []),
+                    ...(demoResult.permissionProject ? [["permissions", "Permissions 🔐"]] as [ResultTab, string][] : []),
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -3190,6 +3193,321 @@ ${demoResult.components.map((c) => `        ├── ${c.name}.tsx`).join("\n")
                       </p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Tab Content: Permissions */}
+              {activeTab === "permissions" && demoResult.permissionProject && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-lg">🔐</span>
+                    <div>
+                      <h4 className="text-sm font-semibold text-purple-300">RBAC Permission System</h4>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        {demoResult.permissionProject.roles.length} roles &middot; {demoResult.permissionProject.roles.reduce((s, r) => s + r.permissions.length, 0)} entity permissions &middot;
+                        Hono middleware &middot; TypeScript types &middot; Seed script
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/70 p-1 overflow-x-auto">
+                    {[
+                      ["roles", "👥 Roles & Permissions"],
+                      ["middleware", "⚡ RBAC Middleware"],
+                      ["types", "📐 Permission Types"],
+                      ["seed", "🌱 Seed Script"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setPermissionsExpandedSection(key)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+                          permissionsExpandedSection === key
+                            ? "bg-surface-800 text-white shadow-sm"
+                            : "text-surface-400 hover:text-surface-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Roles & Permissions Matrix */}
+                  {permissionsExpandedSection === "roles" && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="px-5 py-3 border-b border-white/5">
+                          <h3 className="text-sm font-semibold text-surface-200 flex items-center gap-2">
+                            <span>🔐</span>Permissions Matrix
+                          </h3>
+                          <p className="text-xs text-surface-500 mt-1">Role → Entity → Action mapping. <strong>C</strong>reate <strong>R</strong>ead <strong>U</strong>pdate <strong>D</strong>elete <strong>E</strong>xport <strong>A</strong>pprove</p>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-white/5 bg-surface-900/70">
+                                <th className="text-left px-5 py-2.5 font-semibold text-surface-400 uppercase tracking-wider">Role</th>
+                                {demoResult.permissionProject.roles.length > 0 && demoResult.permissionProject.roles[0].permissions.map((p, i) => (
+                                  <th key={i} className="text-left px-4 py-2.5 font-semibold text-surface-400 uppercase tracking-wider">{p.entity}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {demoResult.permissionProject.roles.map((role, ri) => (
+                                <tr key={ri} className="border-b border-white/5 last:border-0 hover:bg-surface-900/50">
+                                  <td className="px-5 py-2.5">
+                                    <div>
+                                      <span className="text-surface-200 font-semibold">{role.name}</span>
+                                      <p className="text-[10px] text-surface-500 mt-0.5">{role.description}</p>
+                                    </div>
+                                  </td>
+                                  {role.permissions.map((perm, pi) => (
+                                    <td key={pi} className="px-4 py-2.5">
+                                      <div className="flex flex-wrap gap-1">
+                                        {perm.actions.map((action) => {
+                                          const colors: Record<string, string> = {
+                                            create: "text-green-400 bg-green-500/10",
+                                            read: "text-blue-400 bg-blue-500/10",
+                                            update: "text-amber-400 bg-amber-500/10",
+                                            delete: "text-red-400 bg-red-500/10",
+                                            export: "text-cyan-400 bg-cyan-500/10",
+                                            approve: "text-purple-400 bg-purple-500/10",
+                                          };
+                                          return (
+                                            <span key={action} className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${colors[action] || "text-surface-400 bg-surface-800"}`}>
+                                              {action[0].toUpperCase()}
+                                            </span>
+                                          );
+                                        })}
+                                      </div>
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="px-5 py-3 border-t border-white/5">
+                          <button
+                            onClick={() => {
+                              const matrixMd = demoResult.permissionProject?.permissionsMatrix || "";
+                              navigator.clipboard.writeText(matrixMd).then(() => {
+                                setPermissionsCopied("matrix");
+                                setTimeout(() => setPermissionsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {permissionsCopied === "matrix" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy Matrix</>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Role Cards */}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {demoResult.permissionProject.roles.map((role, i) => (
+                          <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-lg">
+                                {role.name === "admin" ? "👑" : role.name === "manager" ? "🎯" : role.name === "editor" ? "✏️" : role.name === "viewer" ? "👁️" : "🎭"}
+                              </span>
+                              <div>
+                                <h4 className="text-sm font-semibold text-surface-200 font-mono">{role.name}</h4>
+                                <p className="text-[11px] text-surface-500">{role.description}</p>
+                              </div>
+                            </div>
+                            <div className="space-y-1.5">
+                              {role.permissions.map((perm, pi) => (
+                                <div key={pi} className="flex items-center justify-between text-[11px]">
+                                  <span className="text-surface-400">{perm.entity}</span>
+                                  <div className="flex gap-1">
+                                    {perm.actions.map((action) => {
+                                      const colors: Record<string, string> = {
+                                        create: "text-green-400 bg-green-500/10",
+                                        read: "text-blue-400 bg-blue-500/10",
+                                        update: "text-amber-400 bg-amber-500/10",
+                                        delete: "text-red-400 bg-red-500/10",
+                                        export: "text-cyan-400 bg-cyan-500/10",
+                                        approve: "text-purple-400 bg-purple-500/10",
+                                      };
+                                      return (
+                                        <span key={action} className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${colors[action] || "text-surface-400 bg-surface-800"}`}>
+                                          {action}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* RBAC Middleware */}
+                  {permissionsExpandedSection === "middleware" && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">⚡</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">rbac-middleware.ts</h3>
+                            <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">Hono middleware</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.permissionProject?.rbacMiddleware || "").then(() => {
+                                setPermissionsCopied("middleware");
+                                setTimeout(() => setPermissionsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {permissionsCopied === "middleware" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="px-5 py-3">
+                          <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{(demoResult.permissionProject?.rbacMiddleware || "").length > 3000 ? (demoResult.permissionProject?.rbacMiddleware || "").slice(0, 3000) + "\n\n// ... (truncated, full code in download ZIP)" : (demoResult.permissionProject?.rbacMiddleware || "")}</code></pre>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 p-4">
+                        <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Middleware API</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {[
+                            { fn: "rbacMiddleware", desc: "Attaches user/role to context (no denial)" },
+                            { fn: "requireRole('admin')", desc: "Restrict route to specific role" },
+                            { fn: "requirePermission('Booking', 'read')", desc: "Check entity + action permission" },
+                            { fn: "autoEnforceRbac", desc: "Auto-infer entity + action from request" },
+                          ].map((api, i) => (
+                            <div key={i} className="rounded-lg bg-surface-950/70 px-3 py-2">
+                              <code className="text-xs font-mono text-brand-400">{api.fn}</code>
+                              <p className="text-[11px] text-surface-500 mt-0.5">{api.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Permission Types */}
+                  {permissionsExpandedSection === "types" && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">📐</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">types.ts</h3>
+                            <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">TypeScript definitions</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.permissionProject?.permissionTypes || "").then(() => {
+                                setPermissionsCopied("types");
+                                setTimeout(() => setPermissionsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {permissionsCopied === "types" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="px-5 py-3">
+                          <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{(demoResult.permissionProject?.permissionTypes || "").length > 2000 ? (demoResult.permissionProject?.permissionTypes || "").slice(0, 2000) + "\n\n// ... (truncated, full code in download ZIP)" : (demoResult.permissionProject?.permissionTypes || "")}</code></pre>
+                        </div>
+                      </div>
+
+                      {/* Permissions Object */}
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">📋</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">permissions.ts</h3>
+                            <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">Permissions object</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.permissionProject?.permissionsObject || "").then(() => {
+                                setPermissionsCopied("permObj");
+                                setTimeout(() => setPermissionsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {permissionsCopied === "permObj" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="px-5 py-3">
+                          <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{(demoResult.permissionProject?.permissionsObject || "").length > 2000 ? (demoResult.permissionProject?.permissionsObject || "").slice(0, 2000) + "\n\n// ... (truncated, full code in download ZIP)" : (demoResult.permissionProject?.permissionsObject || "")}</code></pre>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Seed Script */}
+                  {permissionsExpandedSection === "seed" && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">🌱</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">seed-roles.ts</h3>
+                            <span className="text-[10px] font-medium text-green-500/70 uppercase tracking-wider bg-green-500/10 px-2 py-0.5 rounded">idempotent</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.permissionProject?.seedScript || "").then(() => {
+                                setPermissionsCopied("seed");
+                                setTimeout(() => setPermissionsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {permissionsCopied === "seed" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="px-5 py-3">
+                          <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{(demoResult.permissionProject?.seedScript || "").length > 3000 ? (demoResult.permissionProject?.seedScript || "").slice(0, 3000) + "\n\n// ... (truncated, full code in download ZIP)" : (demoResult.permissionProject?.seedScript || "")}</code></pre>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 p-4">
+                        <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Seed Script Features</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {[
+                            { fn: "seedRoles(db)", desc: "Create/update default roles in database" },
+                            { fn: "ON CONFLICT idempotent", desc: "Safe to run multiple times" },
+                            { fn: "CREATE TABLE roles", desc: "Auto-creates roles + user_roles tables" },
+                            { fn: "bun run seed-roles.ts", desc: "Standalone CLI runner" },
+                          ].map((api, i) => (
+                            <div key={i} className="rounded-lg bg-surface-950/70 px-3 py-2">
+                              <code className="text-xs font-mono text-brand-400">{api.fn}</code>
+                              <p className="text-[11px] text-surface-500 mt-0.5">{api.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
