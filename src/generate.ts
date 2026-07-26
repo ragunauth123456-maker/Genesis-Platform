@@ -1,0 +1,1035 @@
+/**
+ * Generation engine for the ASGP Demo.
+ * Takes natural language business requirements and produces a structured
+ * application blueprint: entities, API endpoints, and frontend component tree.
+ *
+ * Primary path: OpenAI API (gpt-4o-mini) for intelligent, domain-specific generation.
+ * Fallback path: keyword-based domain matching for resilience when the API is unavailable.
+ */
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+export interface GeneratedEntity {
+  name: string;
+  fields: GeneratedField[];
+}
+
+export interface GeneratedField {
+  name: string;
+  type: string;
+  required: boolean;
+  description?: string;
+}
+
+export interface GeneratedEndpoint {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  description: string;
+  returns: string;
+}
+
+export interface GeneratedComponent {
+  name: string;
+  type: "layout" | "page" | "feature" | "shared";
+  description: string;
+  children?: GeneratedComponent[];
+}
+
+export interface GenerationResult {
+  summary: string;
+  domain: string;
+  entities: GeneratedEntity[];
+  endpoints: GeneratedEndpoint[];
+  components: GeneratedComponent[];
+}
+
+// ── OpenAI generation (primary path) ────────────────────────────────────────
+
+const OPENAI_SYSTEM_PROMPT = `You are an expert software architect specialized in analyzing business requirements and designing complete enterprise applications.
+
+Given a user's natural language description of a business need, you produce a structured application blueprint in JSON format. Be specific, creative, and thorough — infer a real domain name, design realistic entities with proper field types, RESTful API endpoints that make sense for the domain, and a plausible component tree for the frontend.
+
+Follow these rules:
+- "domain": A short, descriptive name for the business domain (e.g. "Hotel & Hospitality", "Healthcare Clinic", "Fleet Management & Logistics")
+- "entities": 3-6 core data entities. Each has a "name" (PascalCase singular) and "fields" array.
+  - Every entity MUST have an "id" field of type "UUID".
+  - Fields should have realistic names (camelCase), appropriate types ("string", "integer", "decimal", "boolean", "date", "datetime", "text", "enum", "JSON", "string[]", "UUID → RelatedEntity"), and a "required" boolean.
+  - Use description for enum fields to list possible values, and for FK fields to show the relation.
+  - Include proper foreign key references between related entities.
+- "endpoints": 6-14 RESTful API endpoints covering full CRUD and domain-specific operations. Each has "method" (GET/POST/PUT/PATCH/DELETE), "path" (starting with /), "description", and "returns" (the response type).
+  - Include domain-specific operations beyond basic CRUD (e.g. check-in, approve, assign, search, dashboard).
+  - Use consistent plural resource naming.
+- "components": 4-10 React components. Each has "name" (PascalCase), "type" (one of: "layout", "page", "feature", "shared"), "description", and optional "children" for layout components.
+  - Include at least one layout component with children, several feature components, and page components.
+  - Components should reflect what a real app for this domain would need.
+- "summary": A 2-3 sentence summary of what was generated, tailored to the user's specific request.
+
+The output MUST be valid JSON with exactly this structure:
+{
+  "domain": string,
+  "entities": [{ "name": string, "fields": [{ "name": string, "type": string, "required": boolean, "description"?: string }] }],
+  "endpoints": [{ "method": string, "path": string, "description": string, "returns": string }],
+  "components": [{ "name": string, "type": string, "description": string, "children"?: [{ "name": string, "type": string, "description": string }] }],
+  "summary": string
+}
+
+Return ONLY the JSON object, no markdown code fences, no additional text.`;
+
+async function generateWithOpenAI(input: string): Promise<GenerationResult> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY not configured");
+  }
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: OPENAI_SYSTEM_PROMPT },
+        { role: "user", content: input },
+      ],
+      temperature: 0.7,
+      max_tokens: 4096,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "Unknown error");
+    throw new Error(`OpenAI API error (${response.status}): ${errorText}`);
+  }
+
+  const data = (await response.json()) as {
+    choices: Array<{ message: { content: string } }>;
+  };
+
+  const rawJson = data.choices?.[0]?.message?.content;
+  if (!rawJson) {
+    throw new Error("OpenAI returned empty response");
+  }
+
+  const parsed = JSON.parse(rawJson) as GenerationResult;
+
+  // Validate and sanitize the response
+  return {
+    summary: String(parsed.summary || `Generated application blueprint for your requirements.`),
+    domain: String(parsed.domain || "Custom Application"),
+    entities: Array.isArray(parsed.entities)
+      ? parsed.entities.slice(0, 8).map((e) => ({
+          name: String(e.name || "Entity"),
+          fields: Array.isArray(e.fields)
+            ? e.fields.map((f) => ({
+                name: String(f.name || "field"),
+                type: String(f.type || "string"),
+                required: Boolean(f.required),
+                description: f.description ? String(f.description) : undefined,
+              }))
+            : [],
+        }))
+      : [],
+    endpoints: Array.isArray(parsed.endpoints)
+      ? parsed.endpoints.slice(0, 16).map((ep) => ({
+          method: validateMethod(ep.method),
+          path: String(ep.path || "/"),
+          description: String(ep.description || ""),
+          returns: String(ep.returns || "void"),
+        }))
+      : [],
+    components: Array.isArray(parsed.components)
+      ? parsed.components.map((c) => ({
+          name: String(c.name || "Component"),
+          type: validateComponentType(c.type),
+          description: String(c.description || ""),
+          children: Array.isArray(c.children)
+            ? c.children.map((ch) => ({
+                name: String(ch.name || "Child"),
+                type: validateComponentType(ch.type),
+                description: String(ch.description || ""),
+              }))
+            : undefined,
+        }))
+      : [],
+  };
+}
+
+function validateMethod(m: string): GeneratedEndpoint["method"] {
+  const valid = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+  const upper = String(m).toUpperCase();
+  return valid.includes(upper) ? (upper as GeneratedEndpoint["method"]) : "GET";
+}
+
+function validateComponentType(t: string): GeneratedComponent["type"] {
+  const valid = ["layout", "page", "feature", "shared"];
+  const lower = String(t).toLowerCase();
+  return valid.includes(lower) ? (lower as GeneratedComponent["type"]) : "feature";
+}
+
+// ── Fallback: keyword-based domain matching ─────────────────────────────────
+// (kept intact from the original engine for resilience)
+
+interface DomainTemplate {
+  keywords: string[];
+  name: string;
+  entities: GeneratedEntity[];
+  endpoints: GeneratedEndpoint[];
+  components: GeneratedComponent[];
+}
+
+const DOMAIN_TEMPLATES: Record<string, DomainTemplate> = {
+  hotel: {
+    keywords: [
+      "hotel", "motel", "resort", "inn", "lodging", "accommodation",
+      "room booking", "guest check-in", "housekeeping", "hospitality",
+      "bed and breakfast",
+    ],
+    name: "Hotel & Hospitality",
+    entities: [
+      {
+        name: "Guest",
+        fields: [
+          { name: "id", type: "UUID", required: true, description: "Unique guest identifier" },
+          { name: "firstName", type: "string", required: true },
+          { name: "lastName", type: "string", required: true },
+          { name: "email", type: "string", required: true },
+          { name: "phone", type: "string", required: false },
+          { name: "idDocument", type: "string", required: false, description: "Passport or ID number" },
+          { name: "preferences", type: "JSON", required: false, description: "Room and amenity preferences" },
+        ],
+      },
+      {
+        name: "Room",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "roomNumber", type: "string", required: true },
+          { name: "type", type: "enum", required: true, description: "single, double, suite, penthouse" },
+          { name: "floor", type: "integer", required: true },
+          { name: "pricePerNight", type: "decimal", required: true },
+          { name: "status", type: "enum", required: true, description: "available, occupied, maintenance, cleaning" },
+          { name: "amenities", type: "string[]", required: false, description: "e.g. WiFi, minibar, ocean view" },
+        ],
+      },
+      {
+        name: "Booking",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "guestId", type: "UUID → Guest", required: true },
+          { name: "roomId", type: "UUID → Room", required: true },
+          { name: "checkIn", type: "datetime", required: true },
+          { name: "checkOut", type: "datetime", required: true },
+          { name: "status", type: "enum", required: true, description: "confirmed, checked-in, checked-out, cancelled" },
+          { name: "totalAmount", type: "decimal", required: true },
+          { name: "paymentStatus", type: "enum", required: true, description: "pending, paid, refunded" },
+        ],
+      },
+      {
+        name: "HousekeepingTask",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "roomId", type: "UUID → Room", required: true },
+          { name: "assignedTo", type: "UUID → Staff", required: false },
+          { name: "taskType", type: "enum", required: true, description: "cleaning, turndown, deep-clean, inspection" },
+          { name: "status", type: "enum", required: true, description: "pending, in-progress, completed" },
+          { name: "scheduledAt", type: "datetime", required: true },
+          { name: "completedAt", type: "datetime", required: false },
+        ],
+      },
+    ],
+    endpoints: [
+      { method: "GET", path: "/rooms", description: "List all rooms with availability", returns: "Room[]" },
+      { method: "GET", path: "/rooms/:id", description: "Get room details", returns: "Room" },
+      { method: "POST", path: "/bookings", description: "Create a new booking", returns: "Booking" },
+      { method: "GET", path: "/bookings", description: "List bookings with filters (date, status)", returns: "Booking[]" },
+      { method: "PATCH", path: "/bookings/:id/check-in", description: "Check a guest in", returns: "Booking" },
+      { method: "PATCH", path: "/bookings/:id/check-out", description: "Check a guest out", returns: "Booking" },
+      { method: "GET", path: "/guests", description: "List all guests", returns: "Guest[]" },
+      { method: "POST", path: "/guests", description: "Register a new guest", returns: "Guest" },
+      { method: "GET", path: "/housekeeping/tasks", description: "List housekeeping tasks by status", returns: "HousekeepingTask[]" },
+      { method: "POST", path: "/housekeeping/tasks", description: "Create housekeeping task", returns: "HousekeepingTask" },
+      { method: "PATCH", path: "/housekeeping/tasks/:id/complete", description: "Mark task as completed", returns: "HousekeepingTask" },
+      { method: "GET", path: "/dashboard/occupancy", description: "Get occupancy dashboard data", returns: "OccupancyStats" },
+    ],
+    components: [
+      { type: "layout", name: "HotelDashboardLayout", description: "Main layout with sidebar nav, top bar with hotel name", children: [
+        { type: "shared", name: "SidebarNav", description: "Navigation: Dashboard, Rooms, Bookings, Guests, Housekeeping" },
+        { type: "shared", name: "TopBar", description: "Hotel name, notifications bell, user menu" },
+      ]},
+      { type: "page", name: "DashboardPage", description: "Occupancy rate, revenue chart, today's check-ins/outs, pending tasks" },
+      { type: "feature", name: "RoomGrid", description: "Visual grid of rooms colored by status with filters" },
+      { type: "feature", name: "BookingCalendar", description: "Calendar view of all bookings with drag-to-extend" },
+      { type: "feature", name: "GuestTable", description: "Searchable table of guests with quick-booking action" },
+      { type: "feature", name: "HousekeepingBoard", description: "Kanban board: Pending → In Progress → Completed" },
+    ],
+  },
+
+  hospital: {
+    keywords: [
+      "hospital", "clinic", "medical", "patient", "doctor", "appointment",
+      "healthcare", "health care", "emergency room", "pharmacy", "prescription",
+    ],
+    name: "Healthcare & Hospital",
+    entities: [
+      {
+        name: "Patient",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "firstName", type: "string", required: true },
+          { name: "lastName", type: "string", required: true },
+          { name: "dateOfBirth", type: "date", required: true },
+          { name: "bloodType", type: "string", required: false },
+          { name: "medicalHistory", type: "JSON", required: false },
+        ],
+      },
+      {
+        name: "Doctor",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "firstName", type: "string", required: true },
+          { name: "lastName", type: "string", required: true },
+          { name: "specialization", type: "string", required: true },
+          { name: "licenseNumber", type: "string", required: true },
+        ],
+      },
+      {
+        name: "Appointment",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "patientId", type: "UUID → Patient", required: true },
+          { name: "doctorId", type: "UUID → Doctor", required: true },
+          { name: "scheduledAt", type: "datetime", required: true },
+          { name: "status", type: "enum", required: true, description: "scheduled, in-progress, completed, cancelled" },
+          { name: "notes", type: "text", required: false },
+        ],
+      },
+    ],
+    endpoints: [
+      { method: "GET", path: "/patients", description: "List patients", returns: "Patient[]" },
+      { method: "POST", path: "/patients", description: "Register new patient", returns: "Patient" },
+      { method: "GET", path: "/doctors", description: "List doctors by specialization", returns: "Doctor[]" },
+      { method: "POST", path: "/appointments", description: "Schedule appointment", returns: "Appointment" },
+      { method: "GET", path: "/appointments", description: "List appointments by date/doctor", returns: "Appointment[]" },
+    ],
+    components: [
+      { type: "layout", name: "ClinicDashboardLayout", description: "Sidebar + content layout", children: [
+        { type: "shared", name: "Sidebar", description: "Navigation: Patients, Doctors, Appointments, Pharmacy" },
+      ]},
+      { type: "feature", name: "PatientTable", description: "Searchable patient registry" },
+      { type: "feature", name: "AppointmentCalendar", description: "Calendar with appointment slots" },
+    ],
+  },
+
+  crm: {
+    keywords: [
+      "crm", "customer relationship", "sales pipeline", "lead management",
+      "contact management", "deal tracking", "sales crm", "customer management",
+    ],
+    name: "CRM & Sales",
+    entities: [
+      {
+        name: "Contact",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "firstName", type: "string", required: true },
+          { name: "lastName", type: "string", required: true },
+          { name: "email", type: "string", required: true },
+          { name: "company", type: "string", required: false },
+          { name: "title", type: "string", required: false },
+          { name: "tags", type: "string[]", required: false },
+        ],
+      },
+      {
+        name: "Deal",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "contactId", type: "UUID → Contact", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "value", type: "decimal", required: true },
+          { name: "stage", type: "enum", required: true, description: "lead, qualified, proposal, negotiation, closed-won, closed-lost" },
+          { name: "expectedCloseDate", type: "date", required: false },
+        ],
+      },
+    ],
+    endpoints: [
+      { method: "GET", path: "/contacts", description: "List contacts with search & filters", returns: "Contact[]" },
+      { method: "POST", path: "/contacts", description: "Create contact", returns: "Contact" },
+      { method: "GET", path: "/deals", description: "List deals by stage", returns: "Deal[]" },
+      { method: "POST", path: "/deals", description: "Create deal", returns: "Deal" },
+      { method: "PATCH", path: "/deals/:id/stage", description: "Move deal to next stage", returns: "Deal" },
+    ],
+    components: [
+      { type: "layout", name: "CRMDashboardLayout", description: "Sales-focused layout", children: [] },
+      { type: "feature", name: "PipelineBoard", description: "Kanban board: Lead → Qualified → Proposal → Negotiation → Won" },
+      { type: "feature", name: "ContactList", description: "Rich contact list with search" },
+      { type: "feature", name: "DealCard", description: "Deal summary card with stage indicator" },
+    ],
+  },
+
+  school: {
+    keywords: [
+      "school", "university", "college", "academy", "student", "teacher",
+      "course", "classroom", "grade", "lms", "learning management",
+      "enrollment", "education",
+    ],
+    name: "Education & School",
+    entities: [
+      {
+        name: "Student",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "firstName", type: "string", required: true },
+          { name: "lastName", type: "string", required: true },
+          { name: "grade", type: "string", required: true },
+          { name: "enrollmentDate", type: "date", required: true },
+          { name: "guardianEmail", type: "string", required: false },
+        ],
+      },
+      {
+        name: "Course",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "teacherId", type: "UUID → Teacher", required: true },
+          { name: "schedule", type: "string", required: true },
+          { name: "maxStudents", type: "integer", required: true },
+        ],
+      },
+    ],
+    endpoints: [
+      { method: "GET", path: "/students", description: "List students", returns: "Student[]" },
+      { method: "POST", path: "/students", description: "Enroll student", returns: "Student" },
+      { method: "GET", path: "/courses", description: "List courses", returns: "Course[]" },
+      { method: "POST", path: "/courses/:id/enroll", description: "Enroll student in course", returns: "Enrollment" },
+    ],
+    components: [
+      { type: "layout", name: "SchoolDashboardLayout", description: "Academic layout", children: [] },
+      { type: "feature", name: "StudentRoster", description: "Student list by grade/class" },
+      { type: "feature", name: "CourseCatalog", description: "Browseable course catalog" },
+      { type: "feature", name: "GradeBook", description: "Teacher grade entry interface" },
+    ],
+  },
+
+  logistics: {
+    keywords: [
+      "logistics", "shipping", "fleet", "warehouse", "inventory",
+      "supply chain", "delivery", "tracking", "dispatch", "transportation", "freight",
+    ],
+    name: "Logistics & Supply Chain",
+    entities: [
+      {
+        name: "Shipment",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "trackingNumber", type: "string", required: true },
+          { name: "origin", type: "string", required: true },
+          { name: "destination", type: "string", required: true },
+          { name: "status", type: "enum", required: true, description: "pending, in-transit, at-warehouse, out-for-delivery, delivered" },
+          { name: "estimatedDelivery", type: "datetime", required: false },
+        ],
+      },
+    ],
+    endpoints: [
+      { method: "GET", path: "/shipments", description: "List shipments", returns: "Shipment[]" },
+      { method: "POST", path: "/shipments", description: "Create shipment", returns: "Shipment" },
+      { method: "GET", path: "/shipments/:id/tracking", description: "Get real-time tracking", returns: "TrackingInfo" },
+    ],
+    components: [
+      { type: "layout", name: "LogisticsDashboardLayout", description: "Operations layout", children: [] },
+      { type: "feature", name: "ShipmentTracker", description: "Live shipment tracking map" },
+      { type: "feature", name: "WarehouseGrid", description: "Inventory slots visual grid" },
+    ],
+  },
+
+  ecommerce: {
+    keywords: [
+      "ecommerce", "e-commerce", "shop", "store", "online store", "retail",
+      "product catalog", "cart", "checkout", "order management",
+    ],
+    name: "E-Commerce & Retail",
+    entities: [
+      {
+        name: "Product",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "description", type: "text", required: false },
+          { name: "price", type: "decimal", required: true },
+          { name: "stockQuantity", type: "integer", required: true },
+          { name: "category", type: "string", required: true },
+          { name: "imageUrls", type: "string[]", required: false },
+        ],
+      },
+      {
+        name: "Order",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "customerId", type: "UUID → Customer", required: true },
+          { name: "items", type: "OrderItem[]", required: true },
+          { name: "status", type: "enum", required: true, description: "pending, confirmed, shipped, delivered, cancelled" },
+          { name: "totalAmount", type: "decimal", required: true },
+          { name: "placedAt", type: "datetime", required: true },
+        ],
+      },
+    ],
+    endpoints: [
+      { method: "GET", path: "/products", description: "List products with filters", returns: "Product[]" },
+      { method: "POST", path: "/orders", description: "Place order", returns: "Order" },
+      { method: "GET", path: "/orders", description: "List orders", returns: "Order[]" },
+    ],
+    components: [
+      { type: "layout", name: "StoreDashboardLayout", description: "E-commerce layout", children: [] },
+      { type: "feature", name: "ProductGrid", description: "Product catalog grid" },
+      { type: "feature", name: "OrderPipeline", description: "Order status pipeline" },
+    ],
+  },
+
+  projectManagement: {
+    keywords: [
+      "project management", "task management", "project", "kanban",
+      "scrum", "sprint", "team collaboration", "workflow", "issue tracker", "pm tool",
+    ],
+    name: "Project Management",
+    entities: [
+      {
+        name: "Project",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "description", type: "text", required: false },
+          { name: "status", type: "enum", required: true, description: "planning, active, on-hold, completed" },
+          { name: "ownerId", type: "UUID → User", required: true },
+        ],
+      },
+      {
+        name: "Task",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "projectId", type: "UUID → Project", required: true },
+          { name: "title", type: "string", required: true },
+          { name: "assigneeId", type: "UUID → User", required: false },
+          { name: "status", type: "enum", required: true, description: "todo, in-progress, review, done" },
+          { name: "priority", type: "enum", required: true, description: "low, medium, high, urgent" },
+        ],
+      },
+    ],
+    endpoints: [
+      { method: "GET", path: "/projects", description: "List projects", returns: "Project[]" },
+      { method: "POST", path: "/projects", description: "Create project", returns: "Project" },
+      { method: "GET", path: "/tasks", description: "List tasks with filters", returns: "Task[]" },
+      { method: "POST", path: "/tasks", description: "Create task", returns: "Task" },
+      { method: "PATCH", path: "/tasks/:id/status", description: "Update task status", returns: "Task" },
+    ],
+    components: [
+      { type: "layout", name: "ProjectDashboardLayout", description: "Project-focused layout", children: [] },
+      { type: "feature", name: "KanbanBoard", description: "Draggable kanban board" },
+      { type: "feature", name: "GanttChart", description: "Project timeline gantt chart" },
+    ],
+  },
+
+  hr: {
+    keywords: [
+      "hr", "human resources", "employee", "payroll", "recruitment",
+      "hiring", "onboarding", "leave management", "attendance", "hrms",
+    ],
+    name: "HR & Workforce Management",
+    entities: [
+      {
+        name: "Employee",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "firstName", type: "string", required: true },
+          { name: "lastName", type: "string", required: true },
+          { name: "email", type: "string", required: true },
+          { name: "department", type: "string", required: true },
+          { name: "position", type: "string", required: true },
+          { name: "hireDate", type: "date", required: true },
+        ],
+      },
+      {
+        name: "LeaveRequest",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "employeeId", type: "UUID → Employee", required: true },
+          { name: "type", type: "enum", required: true, description: "annual, sick, personal, unpaid" },
+          { name: "startDate", type: "date", required: true },
+          { name: "endDate", type: "date", required: true },
+          { name: "status", type: "enum", required: true, description: "pending, approved, rejected" },
+        ],
+      },
+    ],
+    endpoints: [
+      { method: "GET", path: "/employees", description: "List employees", returns: "Employee[]" },
+      { method: "POST", path: "/employees", description: "Add employee", returns: "Employee" },
+      { method: "POST", path: "/leave-requests", description: "Submit leave request", returns: "LeaveRequest" },
+      { method: "PATCH", path: "/leave-requests/:id/approve", description: "Approve leave", returns: "LeaveRequest" },
+    ],
+    components: [
+      { type: "layout", name: "HRDashboardLayout", description: "HR admin layout", children: [] },
+      { type: "feature", name: "EmployeeDirectory", description: "Searchable employee directory" },
+      { type: "feature", name: "LeaveCalendar", description: "Calendar showing team leave" },
+    ],
+  },
+
+  restaurant: {
+    keywords: [
+      "restaurant", "cafe", "food", "menu", "dining", "table reservation",
+      "order", "kitchen", "pos", "delivery food",
+    ],
+    name: "Restaurant & Food Service",
+    entities: [
+      {
+        name: "MenuItem",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "description", type: "text", required: false },
+          { name: "price", type: "decimal", required: true },
+          { name: "category", type: "enum", required: true, description: "appetizer, main, dessert, drink" },
+          { name: "available", type: "boolean", required: true },
+        ],
+      },
+      {
+        name: "Order",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "tableNumber", type: "integer", required: true },
+          { name: "items", type: "OrderItem[]", required: true },
+          { name: "status", type: "enum", required: true, description: "placed, preparing, ready, served, paid" },
+          { name: "totalAmount", type: "decimal", required: true },
+        ],
+      },
+    ],
+    endpoints: [
+      { method: "GET", path: "/menu", description: "Get full menu", returns: "MenuItem[]" },
+      { method: "POST", path: "/orders", description: "Place order", returns: "Order" },
+      { method: "PATCH", path: "/orders/:id/status", description: "Update order status", returns: "Order" },
+    ],
+    components: [
+      { type: "layout", name: "RestaurantDashboardLayout", description: "Restaurant operations layout", children: [] },
+      { type: "feature", name: "MenuEditor", description: "Drag-and-drop menu editor" },
+      { type: "feature", name: "OrderQueue", description: "Kitchen order display queue" },
+    ],
+  },
+};
+
+// ── Fallback helpers ────────────────────────────────────────────────────────
+
+function extractCustomEntities(input: string): GeneratedEntity[] {
+  const lower = input.toLowerCase();
+  const entities: GeneratedEntity[] = [];
+  const entityPatterns: { pattern: RegExp; entity: GeneratedEntity }[] = [
+    {
+      pattern: /\b(invoice|billing|payment)\b.*\b(track|manage|system)\b/i,
+      entity: {
+        name: "Invoice",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "number", type: "string", required: true, description: "Auto-incrementing invoice number" },
+          { name: "customerId", type: "UUID → Customer", required: true },
+          { name: "items", type: "InvoiceItem[]", required: true },
+          { name: "totalAmount", type: "decimal", required: true },
+          { name: "status", type: "enum", required: true, description: "draft, sent, paid, overdue, cancelled" },
+          { name: "dueDate", type: "date", required: true },
+          { name: "issuedAt", type: "datetime", required: true },
+        ],
+      },
+    },
+    {
+      pattern: /\b(subscription|recurring|saas|plan)\b/i,
+      entity: {
+        name: "Subscription",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "customerId", type: "UUID → Customer", required: true },
+          { name: "plan", type: "enum", required: true, description: "free, starter, pro, enterprise" },
+          { name: "status", type: "enum", required: true, description: "active, past-due, cancelled, expired" },
+          { name: "startDate", type: "date", required: true },
+          { name: "billingCycle", type: "enum", required: true, description: "monthly, annual" },
+        ],
+      },
+    },
+    {
+      pattern: /\b(review|rating|feedback)\b/i,
+      entity: {
+        name: "Review",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "entityId", type: "UUID", required: true },
+          { name: "authorId", type: "UUID → User", required: true },
+          { name: "rating", type: "integer (1-5)", required: true },
+          { name: "comment", type: "text", required: false },
+          { name: "createdAt", type: "datetime", required: true },
+        ],
+      },
+    },
+    {
+      pattern: /\b(notification|alert|reminder)\b/i,
+      entity: {
+        name: "Notification",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "userId", type: "UUID → User", required: true },
+          { name: "type", type: "enum", required: true, description: "info, warning, success, error" },
+          { name: "title", type: "string", required: true },
+          { name: "message", type: "text", required: true },
+          { name: "read", type: "boolean", required: true },
+          { name: "createdAt", type: "datetime", required: true },
+        ],
+      },
+    },
+    {
+      pattern: /\b(report|analytics|dashboard|metrics|kpi)\b/i,
+      entity: {
+        name: "Report",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "type", type: "enum", required: true, description: "sales, financial, performance, custom" },
+          { name: "parameters", type: "JSON", required: false },
+          { name: "generatedAt", type: "datetime", required: false },
+          { name: "createdBy", type: "UUID → User", required: true },
+        ],
+      },
+    },
+    {
+      pattern: /\b(document|file|attachment|upload)\b.*\b(manage|store|track)\b/i,
+      entity: {
+        name: "Document",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "fileUrl", type: "string", required: true },
+          { name: "size", type: "integer", required: true, description: "File size in bytes" },
+          { name: "mimeType", type: "string", required: true },
+          { name: "uploadedBy", type: "UUID → User", required: true },
+          { name: "uploadedAt", type: "datetime", required: true },
+        ],
+      },
+    },
+    {
+      pattern: /\b(chat|message|conversation|messaging)\b/i,
+      entity: {
+        name: "Message",
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "conversationId", type: "UUID → Conversation", required: true },
+          { name: "senderId", type: "UUID → User", required: true },
+          { name: "content", type: "text", required: true },
+          { name: "sentAt", type: "datetime", required: true },
+          { name: "readAt", type: "datetime", required: false },
+        ],
+      },
+    },
+  ];
+
+  for (const { pattern, entity } of entityPatterns) {
+    if (pattern.test(lower)) {
+      entities.push(entity);
+    }
+  }
+
+  return entities;
+}
+
+function matchDomain(input: string): DomainTemplate | null {
+  const lower = input.toLowerCase();
+  let bestMatch: { key: string; score: number } | null = null;
+
+  for (const [key, template] of Object.entries(DOMAIN_TEMPLATES)) {
+    let score = 0;
+    for (const kw of template.keywords) {
+      if (lower.includes(kw.toLowerCase())) {
+        score += kw.split(" ").length;
+      }
+    }
+    if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+      bestMatch = { key, score };
+    }
+  }
+
+  return bestMatch ? DOMAIN_TEMPLATES[bestMatch.key] : null;
+}
+
+function generateCustomEndpoints(
+  domain: DomainTemplate | null,
+  customEntities: GeneratedEntity[],
+  input: string
+): GeneratedEndpoint[] {
+  const endpoints: GeneratedEndpoint[] = [];
+  const lower = input.toLowerCase();
+
+  if (/\b(login|register|signup|authentication|auth|user account)\b/i.test(lower)) {
+    endpoints.push(
+      { method: "POST", path: "/auth/login", description: "Authenticate user and return JWT", returns: "AuthToken" },
+      { method: "POST", path: "/auth/register", description: "Register new user account", returns: "User" },
+      { method: "GET", path: "/auth/me", description: "Get current authenticated user", returns: "User" },
+    );
+  }
+
+  if (/\b(upload|file|attachment|image)\b/i.test(lower)) {
+    endpoints.push(
+      { method: "POST", path: "/files/upload", description: "Upload file to storage", returns: "FileInfo" },
+    );
+  }
+
+  if (/\b(search|find|lookup|query)\b/i.test(lower)) {
+    endpoints.push(
+      { method: "GET", path: "/search", description: "Global search across entities", returns: "SearchResult[]" },
+    );
+  }
+
+  if (/\b(export|download|csv|pdf|report)\b/i.test(lower)) {
+    endpoints.push(
+      { method: "GET", path: "/export/:entity", description: "Export entity data as CSV/PDF", returns: "File" },
+    );
+  }
+
+  if (/\b(dashboard|overview|analytics|stats|metrics)\b/i.test(lower)) {
+    endpoints.push(
+      { method: "GET", path: "/dashboard/summary", description: "Get aggregated dashboard metrics", returns: "DashboardSummary" },
+    );
+  }
+
+  if (/\b(webhook|integration|api|connect)\b/i.test(lower)) {
+    endpoints.push(
+      { method: "POST", path: "/webhooks", description: "Register a webhook endpoint", returns: "Webhook" },
+    );
+  }
+
+  if (/\b(role|permission|admin|access control|rbac)\b/i.test(lower)) {
+    endpoints.push(
+      { method: "GET", path: "/roles", description: "List roles and permissions", returns: "Role[]" },
+      { method: "POST", path: "/roles", description: "Create role", returns: "Role" },
+      { method: "PATCH", path: "/users/:id/roles", description: "Assign roles to user", returns: "User" },
+    );
+  }
+
+  return endpoints;
+}
+
+function mergeEndpoints(endpoints: GeneratedEndpoint[]): GeneratedEndpoint[] {
+  const seen = new Set<string>();
+  return endpoints.filter((ep) => {
+    const key = `${ep.method}:${ep.path}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function generateGenericComponents(
+  entities: GeneratedEntity[],
+  input: string
+): GeneratedComponent[] {
+  const lower = input.toLowerCase();
+  const components: GeneratedComponent[] = [
+    {
+      type: "layout",
+      name: "AppLayout",
+      description: "Application shell with responsive sidebar navigation and top header",
+      children: [
+        { type: "shared", name: "Sidebar", description: "Navigation links and branding" },
+        { type: "shared", name: "Header", description: "Search bar, notifications, user menu" },
+      ],
+    },
+  ];
+
+  for (const entity of entities) {
+    const name = entity.name;
+    const plural = name.endsWith("s") ? name : name + "s";
+    components.push({
+      type: "page",
+      name: `${name}ManagementPage`,
+      description: `Full CRUD interface for managing ${plural.toLowerCase()}`,
+    });
+    components.push({
+      type: "feature",
+      name: `${name}Table`,
+      description: `Sortable, searchable table of ${plural.toLowerCase()}`,
+    });
+    components.push({
+      type: "feature",
+      name: `${name}Form`,
+      description: `Create/edit form for ${name.toLowerCase()} with validation`,
+    });
+  }
+
+  if (/\b(dashboard|overview|home)\b/i.test(lower)) {
+    components.push({
+      type: "page",
+      name: "DashboardPage",
+      description: "Overview dashboard with key metrics and charts",
+    });
+  }
+
+  if (/\b(login|auth|signin)\b/i.test(lower)) {
+    components.push({
+      type: "page",
+      name: "LoginPage",
+      description: "Authentication page with email/password and social login options",
+    });
+  }
+
+  return components;
+}
+
+function generateSummary(
+  domainName: string | null,
+  entities: GeneratedEntity[],
+  input: string
+): string {
+  const entityList = entities.map((e) => e.name).join(", ");
+  const domainPrefix = domainName ? ` for ${domainName}` : "";
+
+  return `Generated a complete${domainPrefix} application blueprint from your description. The system identified ${entities.length} core data entities (${entityList}) with their relationships, generated RESTful API endpoints for full CRUD operations and business logic, and designed a component tree with layouts, pages, and reusable UI features. This blueprint is ready to be generated into a deployable application.`;
+}
+
+// ── Fallback generation function ────────────────────────────────────────────
+
+function generateWithFallback(input: string): GenerationResult {
+  const domain = matchDomain(input);
+  const customEntities = extractCustomEntities(input);
+
+  const domainEntities = domain ? domain.entities : [];
+  const entityNames = new Set(domainEntities.map((e) => e.name.toLowerCase()));
+  const uniqueCustomEntities = customEntities.filter(
+    (e) => !entityNames.has(e.name.toLowerCase())
+  );
+  const allEntities = [...domainEntities, ...uniqueCustomEntities];
+
+  if (allEntities.length === 0) {
+    const words = input
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .split(/\s+/)
+      .filter((w) => w.length > 3 && !["need", "with", "that", "this", "from", "have", "like", "want", "would", "should", "could", "system", "manage", "track", "platform", "application"].includes(w));
+
+    const uniqueWords = [...new Set(words)].slice(0, 3);
+    for (const word of uniqueWords) {
+      const entityName = word.charAt(0).toUpperCase() + word.slice(1);
+      allEntities.push({
+        name: entityName,
+        fields: [
+          { name: "id", type: "UUID", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "status", type: "enum", required: true, description: "active, inactive, pending" },
+          { name: "createdAt", type: "datetime", required: true },
+          { name: "updatedAt", type: "datetime", required: true },
+        ],
+      });
+    }
+  }
+
+  const domainEndpoints = domain ? domain.endpoints : [];
+  const customEndpoints = generateCustomEndpoints(domain, uniqueCustomEntities, input);
+  const allEndpoints = mergeEndpoints([...domainEndpoints, ...customEndpoints]);
+
+  if (allEndpoints.length === 0) {
+    for (const entity of allEntities) {
+      const name = entity.name.toLowerCase();
+      const plural = name.endsWith("s") ? name : name + "s";
+      allEndpoints.push(
+        { method: "GET", path: `/${plural}`, description: `List all ${plural}`, returns: `${entity.name}[]` },
+        { method: "POST", path: `/${plural}`, description: `Create a new ${name}`, returns: entity.name },
+        { method: "GET", path: `/${plural}/:id`, description: `Get ${name} by ID`, returns: entity.name },
+        { method: "PATCH", path: `/${plural}/:id`, description: `Update ${name}`, returns: entity.name },
+        { method: "DELETE", path: `/${plural}/:id`, description: `Delete ${name}`, returns: "void" },
+      );
+    }
+  }
+
+  const components: GeneratedComponent[] =
+    domain && domain.components.length > 0
+      ? domain.components
+      : generateGenericComponents(allEntities, input);
+
+  return {
+    summary: generateSummary(domain?.name ?? null, allEntities, input),
+    domain: domain?.name ?? "Custom Application",
+    entities: allEntities.slice(0, 8),
+    endpoints: allEndpoints.slice(0, 16),
+    components,
+  };
+}
+
+// ── Main generation function ───────────────────────────────────────────────
+
+export async function generateBlueprint(input: string): Promise<GenerationResult> {
+  // Try OpenAI first; fall back to keyword matching on any failure
+  try {
+    return await generateWithOpenAI(input);
+  } catch (err) {
+    // Log the error for debugging but don't expose to the user
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn("[generate] OpenAI generation failed, using fallback:", message);
+    return generateWithFallback(input);
+  }
+}
+
+// ── Waitlist store (file-based persistence) ─────────────────────────────────
+
+export interface WaitlistEntry {
+  email: string;
+  joinedAt: string;
+}
+
+const WAITLIST_PATH = "./data/waitlist.json";
+
+async function loadWaitlist(): Promise<WaitlistEntry[]> {
+  try {
+    const file = Bun.file(WAITLIST_PATH);
+    if (!(await file.exists())) {
+      return [];
+    }
+    const text = await file.text();
+    if (!text.trim()) {
+      return [];
+    }
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) {
+      console.warn("[waitlist] Corrupted waitlist file — not an array. Resetting.");
+      return [];
+    }
+    return parsed.filter(
+      (e): e is WaitlistEntry =>
+        typeof e === "object" &&
+        e !== null &&
+        typeof e.email === "string" &&
+        typeof e.joinedAt === "string"
+    );
+  } catch (err) {
+    console.warn("[waitlist] Failed to read waitlist file, starting fresh:", err);
+    return [];
+  }
+}
+
+async function saveWaitlist(entries: WaitlistEntry[]): Promise<void> {
+  await Bun.write(WAITLIST_PATH, JSON.stringify(entries, null, 2) + "\n");
+}
+
+export async function addToWaitlist(
+  email: string
+): Promise<{ success: boolean; message: string }> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    return { success: false, message: "Please enter a valid email address." };
+  }
+
+  const entries = await loadWaitlist();
+
+  if (entries.some((e) => e.email === normalized)) {
+    return { success: false, message: "This email is already on the waitlist." };
+  }
+
+  entries.push({ email: normalized, joinedAt: new Date().toISOString() });
+  await saveWaitlist(entries);
+
+  return { success: true, message: "You're on the list! We'll be in touch soon." };
+}
+
+export async function getWaitlistEntries(): Promise<WaitlistEntry[]> {
+  return loadWaitlist();
+}

@@ -1,0 +1,1034 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import {
+  useState,
+  useRef,
+  useEffect,
+  type FormEvent,
+} from "react";
+import {
+  generateBlueprint,
+  addToWaitlist,
+  type GenerationResult,
+} from "~/generate";
+
+// ── Server Functions ───────────────────────────────────────────────────────
+
+const submitGeneration = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    if (typeof data !== "object" || data === null || !("input" in data))
+      throw new Error("Invalid request");
+    return data as { input: string };
+  })
+  .handler(async ({ data }) => {
+    // Simulate processing delay for realism
+    await new Promise((r) => setTimeout(r, 1200));
+    return generateBlueprint(data.input);
+  });
+
+const submitWaitlist = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    if (typeof data !== "object" || data === null || !("email" in data))
+      throw new Error("Invalid request");
+    return data as { email: string };
+  })
+  .handler(async ({ data }) => {
+    return await addToWaitlist(data.email);
+  });
+
+// ── Route definition ──────────────────────────────────────────────────────
+
+export const Route = createFileRoute("/")({
+  component: Home,
+});
+
+// ── Types for demo state ──────────────────────────────────────────────────
+
+type DemoState = "idle" | "loading" | "done" | "error";
+
+// ── Industry card data ────────────────────────────────────────────────────
+
+const INDUSTRIES = [
+  {
+    icon: "🏨",
+    title: "Hotel & Hospitality",
+    desc: "Booking systems, room management, housekeeping tracking, guest portals, and front-desk operations.",
+    color: "from-amber-500/20 to-orange-500/20 border-amber-500/30",
+    iconBg: "bg-amber-500/10 text-amber-400",
+  },
+  {
+    icon: "🏥",
+    title: "Healthcare & Hospital",
+    desc: "Patient records, appointment scheduling, prescription management, and clinical workflows.",
+    color: "from-emerald-500/20 to-teal-500/20 border-emerald-500/30",
+    iconBg: "bg-emerald-500/10 text-emerald-400",
+  },
+  {
+    icon: "📊",
+    title: "CRM & Sales",
+    desc: "Pipeline tracking, contact management, deal forecasting, and automated follow-ups.",
+    color: "from-blue-500/20 to-cyan-500/20 border-blue-500/30",
+    iconBg: "bg-blue-500/10 text-blue-400",
+  },
+  {
+    icon: "🎓",
+    title: "Education & Schools",
+    desc: "Student enrollment, grade books, course scheduling, LMS, and parent portals.",
+    color: "from-purple-500/20 to-violet-500/20 border-purple-500/30",
+    iconBg: "bg-purple-500/10 text-purple-400",
+  },
+  {
+    icon: "🚚",
+    title: "Logistics & Supply Chain",
+    desc: "Fleet tracking, warehouse management, inventory control, and delivery dispatch.",
+    color: "from-rose-500/20 to-pink-500/20 border-rose-500/30",
+    iconBg: "bg-rose-500/10 text-rose-400",
+  },
+  {
+    icon: "🛒",
+    title: "E-Commerce & Retail",
+    desc: "Product catalogs, shopping carts, order management, and payment processing.",
+    color: "from-sky-500/20 to-indigo-500/20 border-sky-500/30",
+    iconBg: "bg-sky-500/10 text-sky-400",
+  },
+  {
+    icon: "📋",
+    title: "Project Management",
+    desc: "Kanban boards, Gantt charts, sprint planning, time tracking, and team collaboration.",
+    color: "from-lime-500/20 to-green-500/20 border-lime-500/30",
+    iconBg: "bg-lime-500/10 text-lime-400",
+  },
+  {
+    icon: "👥",
+    title: "HR & Workforce",
+    desc: "Employee directories, leave management, payroll processing, and recruitment pipelines.",
+    color: "from-fuchsia-500/20 to-pink-500/20 border-fuchsia-500/30",
+    iconBg: "bg-fuchsia-500/10 text-fuchsia-400",
+  },
+];
+
+// ── Example prompts for the demo ──────────────────────────────────────────
+
+const EXAMPLE_PROMPTS = [
+  "I need a hotel booking system with room management, guest check-in, and housekeeping tracking",
+  "Build a patient management system for a clinic with appointment scheduling and medical records",
+  "Create a CRM with contact management, deal pipeline, and email integration",
+  "I want a school management platform with student enrollment, courses, and grade tracking",
+];
+
+// ── Tab types for results ─────────────────────────────────────────────────
+
+type ResultTab = "entities" | "endpoints" | "components";
+
+// ── Animated typing placeholder ───────────────────────────────────────────
+
+function TypingPlaceholder() {
+  const [text, setText] = useState("");
+  const [promptIndex, setPromptIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const prompt = EXAMPLE_PROMPTS[promptIndex];
+    const timeout = setTimeout(
+      () => {
+        if (!isDeleting) {
+          if (charIndex < prompt.length) {
+            setText(prompt.slice(0, charIndex + 1));
+            setCharIndex(charIndex + 1);
+          } else {
+            setTimeout(() => setIsDeleting(true), 2000);
+          }
+        } else {
+          if (charIndex > 0) {
+            setText(prompt.slice(0, charIndex - 1));
+            setCharIndex(charIndex - 1);
+          } else {
+            setIsDeleting(false);
+            setPromptIndex((promptIndex + 1) % EXAMPLE_PROMPTS.length);
+          }
+        }
+      },
+      isDeleting ? 25 : 40
+    );
+    return () => clearTimeout(timeout);
+  }, [charIndex, isDeleting, promptIndex]);
+
+  return (
+    <span className="pointer-events-none text-surface-500">
+      {text}
+      <span className="animate-pulse text-brand-400">|</span>
+    </span>
+  );
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
+
+function Home() {
+  const [demoInput, setDemoInput] = useState("");
+  const [demoState, setDemoState] = useState<DemoState>("idle");
+  const [demoResult, setDemoResult] = useState<GenerationResult | null>(null);
+  const [demoError, setDemoError] = useState("");
+  const [activeTab, setActiveTab] = useState<ResultTab>("entities");
+  const [expandedEntity, setExpandedEntity] = useState<string | null>(null);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistStatus, setWaitlistStatus] = useState<
+    "idle" | "submitting" | "success" | "error"
+  >("idle");
+  const [waitlistMessage, setWaitlistMessage] = useState("");
+  const [scrolled, setScrolled] = useState(false);
+
+  const demoRef = useRef<HTMLElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollToDemo = () => {
+    demoRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleGenerate = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!demoInput.trim()) return;
+
+    setDemoState("loading");
+    setDemoError("");
+    setDemoResult(null);
+
+    try {
+      const result = await submitGeneration({ data: { input: demoInput } });
+      setDemoResult(result);
+      setDemoState("done");
+      setActiveTab("entities");
+      setExpandedEntity(null);
+      // Scroll to results after render
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+    } catch (err) {
+      setDemoError(
+        err instanceof Error ? err.message : "Something went wrong. Please try again."
+      );
+      setDemoState("error");
+    }
+  };
+
+  const handleWaitlist = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!waitlistEmail.trim()) return;
+
+    setWaitlistStatus("submitting");
+    try {
+      const result = await submitWaitlist({ data: { email: waitlistEmail } });
+      setWaitlistStatus(result.success ? "success" : "error");
+      setWaitlistMessage(result.message);
+      if (result.success) setWaitlistEmail("");
+    } catch {
+      setWaitlistStatus("error");
+      setWaitlistMessage("Something went wrong. Please try again.");
+    }
+  };
+
+  const useExample = (prompt: string) => {
+    setDemoInput(prompt);
+    demoRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  return (
+    <div className="min-h-dvh bg-surface-950 text-surface-100">
+      {/* ── Navigation ──────────────────────────────────────── */}
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? "border-b border-white/5 bg-surface-950/80 backdrop-blur-xl"
+            : "bg-transparent"
+        }`}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <a href="#" className="flex items-center gap-2.5 font-bold text-lg tracking-tight">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
+              G
+            </span>
+            <span className="hidden sm:inline">Genesis</span>
+          </a>
+          <div className="flex items-center gap-4 text-sm">
+            <button
+              onClick={scrollToDemo}
+              className="hidden sm:block text-surface-400 transition-colors hover:text-white"
+            >
+              Demo
+            </button>
+            <a
+              href="#waitlist"
+              className="hidden sm:block text-surface-400 transition-colors hover:text-white"
+            >
+              Waitlist
+            </a>
+            <button
+              onClick={scrollToDemo}
+              className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-400 hover:glow"
+            >
+              Try the Demo
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* ── Hero ────────────────────────────────────────────── */}
+      <section className="relative flex min-h-dvh flex-col items-center justify-center px-6 pt-24 pb-16">
+        {/* Background gradient */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 left-1/2 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-brand-500/10 blur-[120px]" />
+          <div className="absolute top-1/3 right-0 h-[400px] w-[500px] rounded-full bg-purple-500/8 blur-[100px]" />
+          <div className="absolute bottom-0 left-0 h-[400px] w-[500px] rounded-full bg-blue-500/6 blur-[100px]" />
+        </div>
+
+        <div className="relative z-10 flex max-w-4xl flex-col items-center text-center">
+          {/* Badge */}
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-500/20 bg-brand-500/5 px-4 py-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-500" />
+            </span>
+            <span className="text-sm font-medium text-brand-300">
+              Autonomous Software Generation
+            </span>
+          </div>
+
+          <h1 className="max-w-3xl text-5xl font-extrabold tracking-tight sm:text-6xl lg:text-7xl">
+            Generate complete{" "}
+            <span className="gradient-text">enterprise software</span>{" "}
+            from business requirements
+          </h1>
+
+          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-surface-400 sm:text-xl">
+            Describe your business need in natural language. Genesis instantly
+            analyzes your requirements and generates a complete, deployable
+            application — data models, APIs, frontend components, workflows,
+            and more. The factory builds; you deploy.
+          </p>
+
+          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
+            <button
+              onClick={scrollToDemo}
+              className="group relative rounded-xl bg-brand-500 px-8 py-4 text-base font-semibold text-white transition-all hover:bg-brand-400 hover:glow-strong"
+            >
+              Try the Demo
+              <span className="ml-2 inline-block transition-transform group-hover:translate-x-1">
+                →
+              </span>
+            </button>
+            <a
+              href="#how-it-works"
+              className="rounded-xl border border-white/10 px-8 py-4 text-base font-medium text-surface-300 transition-all hover:border-white/20 hover:text-white"
+            >
+              How it works
+            </a>
+          </div>
+
+          {/* Trust indicator */}
+          <div className="mt-16 flex items-center gap-6 text-sm text-surface-500">
+            <span>Generates production-ready code</span>
+            <span className="h-1 w-1 rounded-full bg-surface-600" />
+            <span>Full-stack applications</span>
+            <span className="h-1 w-1 rounded-full bg-surface-600" />
+            <span>Deploy in minutes</span>
+          </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+          <svg
+            className="h-5 w-5 text-surface-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 14l-7 7m0 0l-7-7m7 7V3"
+            />
+          </svg>
+        </div>
+      </section>
+
+      {/* ── How It Works ───────────────────────────────────── */}
+      <section
+        id="how-it-works"
+        className="relative border-t border-white/5 px-6 py-24 sm:py-32"
+      >
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-16 text-center">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              How it{" "}
+              <span className="gradient-text">works</span>
+            </h2>
+            <p className="mt-4 text-surface-400">
+              Four steps from idea to deployed application
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                step: "01",
+                icon: (
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                ),
+                title: "Describe",
+                desc: "Write your business requirements in plain English. No code, no diagrams — just describe what you need.",
+              },
+              {
+                step: "02",
+                icon: (
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                ),
+                title: "Generate",
+                desc: "Genesis analyzes your requirements and generates a full application blueprint — entities, APIs, and UI components.",
+              },
+              {
+                step: "03",
+                icon: (
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                ),
+                title: "Customize",
+                desc: "Refine the generated blueprint, add custom business logic, and fine-tune the design to match your brand.",
+              },
+              {
+                step: "04",
+                icon: (
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                  </svg>
+                ),
+                title: "Deploy",
+                desc: "One-click deploy to production. Your generated application is live, secured, and ready for real users.",
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-900/50 p-6 transition-all hover:border-white/10 hover:bg-surface-900"
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500/10 text-brand-400 transition-colors group-hover:bg-brand-500/20">
+                    {item.icon}
+                  </div>
+                  <span className="text-sm font-medium text-surface-600">
+                    {item.step}
+                  </span>
+                </div>
+                <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-surface-400">
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Generated Industries ────────────────────────────── */}
+      <section className="border-t border-white/5 px-6 py-24 sm:py-32">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-16 text-center">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Generate <span className="gradient-text">any</span> enterprise system
+            </h2>
+            <p className="mt-4 text-surface-400">
+              The platform understands industry-specific requirements out of the box
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {INDUSTRIES.map((industry, i) => (
+              <div
+                key={i}
+                className={`group relative overflow-hidden rounded-2xl border bg-surface-900/50 bg-gradient-to-br ${industry.color} p-5 transition-all hover:-translate-y-1 hover:border-white/10 hover:bg-surface-900 hover:shadow-lg`}
+              >
+                <div
+                  className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl ${industry.iconBg} text-lg`}
+                >
+                  {industry.icon}
+                </div>
+                <h3 className="mb-1.5 text-sm font-semibold">{industry.title}</h3>
+                <p className="text-xs leading-relaxed text-surface-400">
+                  {industry.desc}
+                </p>
+                <div className="mt-3 flex items-center gap-1 text-xs font-medium text-brand-400 opacity-0 transition-opacity group-hover:opacity-100">
+                  Generate →
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Generation Demo ─────────────────────────────────── */}
+      <section
+        ref={demoRef}
+        id="demo"
+        className="relative border-t border-white/5 px-6 py-24 sm:py-32"
+      >
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute top-1/2 left-1/2 h-[500px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-500/5 blur-[100px]" />
+        </div>
+
+        <div className="relative z-10 mx-auto max-w-4xl">
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              See it in{" "}
+              <span className="gradient-text">action</span>
+            </h2>
+            <p className="mt-4 text-surface-400">
+              Describe a business need below and watch Genesis generate a complete application blueprint
+            </p>
+          </div>
+
+          {/* Demo Input */}
+          <form onSubmit={handleGenerate} className="relative mb-4">
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-surface-900/70 backdrop-blur transition-all focus-within:border-brand-500/30 focus-within:glow">
+              <div className="relative">
+                <textarea
+                  value={demoInput}
+                  onChange={(e) => setDemoInput(e.target.value)}
+                  placeholder=" "
+                  rows={4}
+                  className="w-full resize-none bg-transparent px-6 pt-6 pb-2 text-base text-surface-100 placeholder-transparent outline-none"
+                  disabled={demoState === "loading"}
+                />
+                <label className="pointer-events-none absolute left-6 top-5 text-sm text-surface-500 transition-all">
+                  Describe your business requirements in natural language...
+                </label>
+                {!demoInput && (
+                  <div className="pointer-events-none absolute left-6 top-5 text-sm">
+                    <TypingPlaceholder />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-white/5 px-5 py-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {EXAMPLE_PROMPTS.slice(0, 3).map((prompt, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => useExample(prompt)}
+                      className="rounded-full border border-white/5 px-2.5 py-1 text-xs text-surface-500 transition-colors hover:border-white/15 hover:text-surface-300"
+                      title={prompt}
+                    >
+                      {prompt.length > 45
+                        ? prompt.slice(0, 45) + "..."
+                        : prompt}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="submit"
+                  disabled={demoState === "loading" || !demoInput.trim()}
+                  className="flex items-center gap-2 rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {demoState === "loading" ? (
+                    <>
+                      <svg
+                        className="h-4 w-4 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      Generate Blueprint
+                      <span>→</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+
+          {/* Loading State */}
+          {demoState === "loading" && (
+            <div className="rounded-2xl border border-white/5 bg-surface-900/50 p-12 text-center">
+              <div className="mx-auto flex max-w-sm flex-col items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/10">
+                  <svg
+                    className="h-8 w-8 animate-spin text-brand-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Analyzing your requirements...</h3>
+                  <p className="mt-1 text-sm text-surface-400">
+                    Genesis is identifying entities, relationships, and business logic
+                  </p>
+                </div>
+                <div className="flex w-full max-w-xs flex-col gap-2">
+                  {["Parsing business domain...", "Extracting data entities...", "Designing API endpoints...", "Structuring UI components..."].map(
+                    (step, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2 text-xs text-surface-500 animate-pulse"
+                        style={{ animationDelay: `${i * 200}ms` }}
+                      >
+                        <svg className="h-3 w-3 shrink-0 text-brand-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        {step}
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {demoState === "error" && (
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6 text-center">
+              <p className="text-red-400">{demoError}</p>
+              <button
+                onClick={() => {
+                  setDemoState("idle");
+                  setDemoError("");
+                }}
+                className="mt-3 text-sm text-surface-400 underline hover:text-white"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {/* Results */}
+          {demoState === "done" && demoResult && (
+            <div ref={resultsRef} className="space-y-6">
+              {/* Summary */}
+              <div className="rounded-2xl border border-brand-500/20 bg-brand-500/5 p-6">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-brand-500/20 text-sm text-brand-400">
+                    ✦
+                  </span>
+                  <div>
+                    <h3 className="font-semibold text-brand-300">
+                      {demoResult.domain} — Blueprint Generated
+                    </h3>
+                    <p className="mt-1 text-sm leading-relaxed text-surface-400">
+                      {demoResult.summary}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/50 p-1">
+                {(
+                  [
+                    ["entities", `Entities (${demoResult.entities.length})`],
+                    ["endpoints", `API Endpoints (${demoResult.endpoints.length})`],
+                    ["components", `Components (${demoResult.components.length})`],
+                  ] as [ResultTab, string][]
+                ).map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                      activeTab === tab
+                        ? "bg-surface-800 text-white shadow-sm"
+                        : "text-surface-400 hover:text-surface-200"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content: Entities */}
+              {activeTab === "entities" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {demoResult.entities.map((entity, i) => (
+                    <div
+                      key={i}
+                      className="overflow-hidden rounded-xl border border-white/5 bg-surface-900/50 transition-all hover:border-white/10"
+                    >
+                      <button
+                        onClick={() =>
+                          setExpandedEntity(
+                            expandedEntity === entity.name ? null : entity.name
+                          )
+                        }
+                        className="flex w-full items-center justify-between px-5 py-4 text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-500/10">
+                            <span className="text-sm font-bold text-brand-400">
+                              {entity.name.slice(0, 2).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold">{entity.name}</h4>
+                            <p className="text-xs text-surface-500">
+                              {entity.fields.length} fields
+                            </p>
+                          </div>
+                        </div>
+                        <svg
+                          className={`h-4 w-4 text-surface-500 transition-transform ${
+                            expandedEntity === entity.name ? "rotate-180" : ""
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </button>
+
+                      {expandedEntity === entity.name && (
+                        <div className="border-t border-white/5 px-5 pb-4 pt-2">
+                          <div className="space-y-1.5">
+                            {entity.fields.map((field, j) => (
+                              <div
+                                key={j}
+                                className="flex items-center justify-between rounded-lg bg-surface-950/50 px-3 py-2"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-sm font-medium text-surface-200 truncate">
+                                    {field.name}
+                                  </span>
+                                  {field.required && (
+                                    <span className="shrink-0 rounded bg-red-500/10 px-1 py-0.5 text-[10px] font-medium text-red-400">
+                                      REQUIRED
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <code className="text-xs text-brand-400">
+                                    {field.type}
+                                  </code>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Tab Content: Endpoints */}
+              {activeTab === "endpoints" && (
+                <div className="overflow-hidden rounded-xl border border-white/5">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-white/5 bg-surface-900/70">
+                          <th className="px-5 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                            Method
+                          </th>
+                          <th className="px-5 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                            Endpoint
+                          </th>
+                          <th className="px-5 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider hidden sm:table-cell">
+                            Description
+                          </th>
+                          <th className="px-5 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider hidden md:table-cell">
+                            Returns
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {demoResult.endpoints.map((ep, i) => (
+                          <tr
+                            key={i}
+                            className="border-b border-white/[0.02] transition-colors hover:bg-white/[0.02]"
+                          >
+                            <td className="px-5 py-3">
+                              <span
+                                className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ${
+                                  ep.method === "GET"
+                                    ? "bg-green-500/10 text-green-400"
+                                    : ep.method === "POST"
+                                      ? "bg-blue-500/10 text-blue-400"
+                                      : ep.method === "PATCH" || ep.method === "PUT"
+                                        ? "bg-amber-500/10 text-amber-400"
+                                        : "bg-red-500/10 text-red-400"
+                                }`}
+                              >
+                                {ep.method}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 font-mono text-xs text-surface-200">
+                              {ep.path}
+                            </td>
+                            <td className="px-5 py-3 text-surface-400 hidden sm:table-cell">
+                              {ep.description}
+                            </td>
+                            <td className="px-5 py-3 font-mono text-xs text-brand-400 hidden md:table-cell">
+                              {ep.returns}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab Content: Components */}
+              {activeTab === "components" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {demoResult.components.map((comp, i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border border-white/5 bg-surface-900/50 p-5 transition-all hover:border-white/10"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <span
+                          className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                            comp.type === "layout"
+                              ? "bg-purple-500/10 text-purple-400"
+                              : comp.type === "page"
+                                ? "bg-blue-500/10 text-blue-400"
+                                : comp.type === "feature"
+                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  : "bg-surface-700 text-surface-300"
+                          }`}
+                        >
+                          {comp.type}
+                        </span>
+                      </div>
+                      <h4 className="font-semibold font-mono text-sm">
+                        &lt;{comp.name} /&gt;
+                      </h4>
+                      <p className="mt-1 text-xs text-surface-400">
+                        {comp.description}
+                      </p>
+                      {comp.children && comp.children.length > 0 && (
+                        <div className="mt-3 border-t border-white/5 pt-3">
+                          <p className="text-[10px] font-medium text-surface-600 uppercase tracking-wider mb-2">
+                            Children
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {comp.children.map((child, j) => (
+                              <span
+                                key={j}
+                                className="inline-flex items-center rounded-md bg-surface-800 px-2 py-1 text-xs font-mono text-surface-300"
+                              >
+                                {child.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* "What's next?" CTA */}
+              <div className="rounded-2xl border border-white/10 bg-surface-900/70 p-6 text-center">
+                <h3 className="font-semibold text-lg">
+                  Ready to build the real thing?
+                </h3>
+                <p className="mt-1 text-sm text-surface-400">
+                  Join the waitlist to get early access when Genesis launches. This blueprint
+                  becomes a fully deployable application.
+                </p>
+                <button
+                  onClick={() => {
+                    document
+                      .getElementById("waitlist")
+                      ?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-sm font-semibold text-surface-900 transition-all hover:bg-surface-200"
+                >
+                  Join the Waitlist
+                  <span>→</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── Genesis AI ──────────────────────────────────────── */}
+      <section className="border-t border-white/5 px-6 py-24 sm:py-32">
+        <div className="mx-auto max-w-4xl text-center">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-500/5 px-4 py-1.5">
+            <span className="text-sm font-medium text-purple-300">
+              The Self-Expanding Ecosystem
+            </span>
+          </div>
+
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Genesis <span className="gradient-text">AI</span>
+          </h2>
+          <p className="mt-4 text-lg leading-relaxed text-surface-400">
+            The platform's first generated product is itself an autonomous business
+            operating system. Genesis AI can generate customized business platforms
+            for any organization — CRM, ERP, LMS, or something entirely new. Every
+            generated application feeds back into the engine, making the platform
+            smarter with each generation.
+          </p>
+
+          <div className="mt-10 grid gap-4 sm:grid-cols-3">
+            {[
+              { title: "Self-Generating", desc: "Genesis AI generates itself — the platform builds the platform" },
+              { title: "Self-Improving", desc: "Every generated app trains the engine, expanding capabilities" },
+              { title: "Infinitely Scalable", desc: "From single feature to enterprise suite — no limits" },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-white/5 bg-surface-900/50 p-5"
+              >
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400 text-lg">
+                  {["🔄", "🧠", "∞"][i]}
+                </div>
+                <h3 className="font-semibold text-sm">{item.title}</h3>
+                <p className="mt-1 text-xs text-surface-400">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Waitlist ────────────────────────────────────────── */}
+      <section
+        id="waitlist"
+        className="border-t border-white/5 px-6 py-24 sm:py-32"
+      >
+        <div className="mx-auto max-w-xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Get early <span className="gradient-text">access</span>
+          </h2>
+          <p className="mt-4 text-surface-400">
+            Join the waitlist to be first in line when Genesis launches. Early
+            members get priority access and founding-tier pricing.
+          </p>
+
+          <form
+            onSubmit={handleWaitlist}
+            className="mt-8 flex flex-col gap-3 sm:flex-row"
+          >
+            <input
+              type="email"
+              value={waitlistEmail}
+              onChange={(e) => setWaitlistEmail(e.target.value)}
+              placeholder="you@company.com"
+              className="flex-1 rounded-xl border border-white/10 bg-surface-900/70 px-5 py-3 text-sm text-white placeholder-surface-500 outline-none transition-all focus:border-brand-500/30 focus:glow"
+              disabled={waitlistStatus === "submitting"}
+            />
+            <button
+              type="submit"
+              disabled={waitlistStatus === "submitting" || !waitlistEmail.trim()}
+              className="rounded-xl bg-brand-500 px-8 py-3 text-sm font-semibold text-white transition-all hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {waitlistStatus === "submitting" ? "Joining..." : "Join Waitlist"}
+            </button>
+          </form>
+
+          {waitlistMessage && (
+            <div
+              className={`mt-4 rounded-xl px-4 py-3 text-sm ${
+                waitlistStatus === "success"
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                  : "bg-red-500/10 text-red-400 border border-red-500/20"
+              }`}
+            >
+              {waitlistMessage}
+            </div>
+          )}
+
+          <p className="mt-4 text-xs text-surface-600">
+            No spam, ever. We'll only email you when Genesis launches.
+          </p>
+        </div>
+      </section>
+
+      {/* ── Footer ──────────────────────────────────────────── */}
+      <footer className="border-t border-white/5 px-6 py-12">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-500 text-xs font-bold text-white">
+              G
+            </span>
+            <span className="text-sm font-semibold">Genesis Platform</span>
+          </div>
+
+          <div className="flex items-center gap-6 text-sm text-surface-500">
+            <a href="#demo" className="transition-colors hover:text-white">
+              Demo
+            </a>
+            <a href="#how-it-works" className="transition-colors hover:text-white">
+              How it Works
+            </a>
+            <a href="#waitlist" className="transition-colors hover:text-white">
+              Waitlist
+            </a>
+          </div>
+
+          <p className="text-xs text-surface-600">
+            © {new Date().getFullYear()} Genesis Platform. Built with{" "}
+            <a
+              href="https://cto.new"
+              className="underline hover:text-surface-400"
+            >
+              cto.new
+            </a>
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
