@@ -438,7 +438,7 @@ function generateDeployScript(domainSlug: string, entities: GeneratedEntity[]): 
 set -euo pipefail
 
 APP_NAME="${domainSlug || "app"}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Colors ─────────────────────────────────────────────────────────────────
 GREEN='\\033[0;32m'
@@ -447,10 +447,10 @@ RED='\\033[0;31m'
 BLUE='\\033[0;34m'
 NC='\\033[0m' # No Color
 
-log()  { echo -e "\\${GREEN}[✓]\\${NC} \$1"; }
-warn() { echo -e "\\${YELLOW}[!]\\${NC} \$1"; }
-err()  { echo -e "\\${RED}[✗]\\${NC} \$1"; }
-info() { echo -e "\\${BLUE}[i]\\${NC} \$1"; }
+log()  { echo -e "\\\${GREEN}[✓]\\\${NC} \$1"; }
+warn() { echo -e "\\\${YELLOW}[!]\\\${NC} \$1"; }
+err()  { echo -e "\\\${RED}[✗]\\\${NC} \$1"; }
+info() { echo -e "\\\${BLUE}[i]\\\${NC} \$1"; }
 
 # ── Prerequisites check ────────────────────────────────────────────────────
 check_prereqs() {
@@ -479,7 +479,7 @@ setup_env() {
     else
       cat > backend/.env << 'EOF'
 # Database
-DATABASE_URL=postgres://app_user:change_me_in_production@localhost:5432/${APP_NAME}_db
+DATABASE_URL=postgres://app_user:change_me_in_production@localhost:5432/\${APP_NAME}_db
 
 # Server
 PORT=3001
@@ -499,10 +499,10 @@ build_images() {
   info "Building Docker images..."
 
   info "  → Building backend image..."
-  docker build -t "${APP_NAME}-api:latest" ./backend
+  docker build -t "\${APP_NAME}-api:latest" ./backend
 
   info "  → Building frontend image..."
-  docker build -t "${APP_NAME}-web:latest" -f ./frontend/Dockerfile.frontend ./frontend
+  docker build -t "\${APP_NAME}-web:latest" -f ./frontend/Dockerfile.frontend ./frontend
 
   log "Docker images built successfully"
 }
