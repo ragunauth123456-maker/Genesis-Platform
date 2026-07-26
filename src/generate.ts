@@ -13,13 +13,16 @@ import { generateFrontendProject } from "./frontend-project";
 import { generateDashboard } from "./dashboard-generator";
 import { generateDeployment } from "./deployment-generator";
 import { generateWorkflows } from "./workflow-generator";
+import { generateReports, buildReportRunnerCode, buildScheduledConfigJSON } from "./report-generator";
 import type { BackendProject } from "./backend-project";
 import type { FrontendProject } from "./frontend-project";
 import type { DashboardProject } from "./dashboard-generator";
 import type { DeploymentProject } from "./deployment-generator";
 import type { WorkflowProject } from "./workflow-generator";
+import type { ReportProject } from "./report-generator";
 
-export type { BackendProject, FrontendProject, DashboardProject, DeploymentProject, WorkflowProject };
+export type { BackendProject, FrontendProject, DashboardProject, DeploymentProject, WorkflowProject, ReportProject };
+export { buildReportRunnerCode, buildScheduledConfigJSON };
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -82,6 +85,9 @@ export interface GenerationResult {
   dashboardProject?: DashboardProject;
   deploymentProject?: DeploymentProject;
   workflowProject?: WorkflowProject;
+  reportProject?: ReportProject;
+  reportRunner?: string;
+  scheduledConfigJson?: string;
 }
 
 // ── OpenAI generation (primary path) ────────────────────────────────────────
@@ -1849,8 +1855,11 @@ function attachSchemaArtifacts(result: GenerationResult): GenerationResult {
   const dashboardProject = generateDashboard(result.entities, result.endpoints, relationships);
   const deploymentProject = generateDeployment(result.entities, apiRoutes, result.domain);
   const workflowProject = generateWorkflows(result.entities, result.endpoints, relationships);
+  const reportProject = generateReports(result.entities, result.endpoints, sql);
+  const reportRunner = buildReportRunnerCode(reportProject);
+  const scheduledConfigJson = buildScheduledConfigJSON(reportProject);
 
-  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject, deploymentProject, workflowProject };
+  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject, deploymentProject, workflowProject, reportProject, reportRunner, scheduledConfigJson };
 }
 
 // ── Main generation function ───────────────────────────────────────────────

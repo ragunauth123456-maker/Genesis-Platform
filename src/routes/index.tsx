@@ -129,7 +129,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows" | "reports";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -202,6 +202,8 @@ function Home() {
   const [deployCopied, setDeployCopied] = useState<string | null>(null);
   const [workflowsExpandedSection, setWorkflowsExpandedSection] = useState<string>("stateMachines");
   const [workflowsCopied, setWorkflowsCopied] = useState<string | null>(null);
+  const [reportsExpandedSection, setReportsExpandedSection] = useState<string>("summary");
+  const [reportsCopied, setReportsCopied] = useState<string | null>(null);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -819,6 +821,8 @@ function Home() {
                     ...(demoResult.frontendProject ? [["frontend", "Frontend"]] as [ResultTab, string][] : []),
                     ...(demoResult.dashboardProject ? [["dashboard", "Dashboard"]] as [ResultTab, string][] : []),
                     ...(demoResult.deploymentProject ? [["deploy", "Deploy 🚀"]] as [ResultTab, string][] : []),
+                    ...(demoResult.workflowProject ? [["workflows", "Workflows 🔄"]] as [ResultTab, string][] : []),
+                    ...(demoResult.reportProject ? [["reports", "Reports 📊"]] as [ResultTab, string][] : []),
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -2890,6 +2894,299 @@ ${demoResult.components.map((c) => `        ├── ${c.name}.tsx`).join("\n")
                       <p className="text-xs text-surface-400 mt-0.5">
                         State Machines &middot; Approval Flows &middot; Process Flows &middot; Reusable Engine &mdash;
                         Ready to wire into <code className="text-brand-400">routes</code> and <code className="text-brand-400">middleware</code>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab Content: Reports */}
+              {activeTab === "reports" && demoResult.reportProject && (
+                <div className="space-y-4">
+                  <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/70 p-1 overflow-x-auto">
+                    {[
+                      ["summary", "📋 Summary Reports"],
+                      ["detail", "📄 Detail Reports"],
+                      ["dashboard", "📊 Cross-Entity Reports"],
+                      ["scheduled", "📅 Scheduled Reports"],
+                      ["runner", "⚡ Report Runner"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setReportsExpandedSection(key)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+                          reportsExpandedSection === key
+                            ? "bg-surface-800 text-white shadow-sm"
+                            : "text-surface-400 hover:text-surface-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Summary Reports */}
+                  {reportsExpandedSection === "summary" && (
+                    <div className="space-y-3">
+                      {demoResult.reportProject.reports.filter(r => r.type === "summary").map((r, i) => (
+                        <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">📋</span>
+                              <h3 className="text-sm font-semibold text-surface-200 font-mono">{r.name}</h3>
+                              <span className="text-[10px] font-medium text-green-500/70 uppercase tracking-wider bg-green-500/10 px-2 py-0.5 rounded">{r.entity}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(r.sql).then(() => {
+                                    setReportsCopied(`sql-sum-${i}`);
+                                    setTimeout(() => setReportsCopied(null), 2000);
+                                  }).catch(() => {});
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                              >
+                                {reportsCopied === `sql-sum-${i}` ? (
+                                  <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                                ) : (
+                                  <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy SQL</>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(r.tsCode).then(() => {
+                                    setReportsCopied(`ts-sum-${i}`);
+                                    setTimeout(() => setReportsCopied(null), 2000);
+                                  }).catch(() => {});
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                              >
+                                {reportsCopied === `ts-sum-${i}` ? (
+                                  <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                                ) : (
+                                  <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy TS</>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          {/* SQL */}
+                          <div className="px-5 py-3 border-b border-white/5">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">SQL Query</h4>
+                            <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto"><code>{r.sql}</code></pre>
+                          </div>
+                          {/* TypeScript */}
+                          <div className="px-5 py-3">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">TypeScript Module</h4>
+                            <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{r.tsCode.length > 2000 ? r.tsCode.slice(0, 2000) + '\n\n// ... (truncated, full code in download ZIP)' : r.tsCode}</code></pre>
+                          </div>
+                        </div>
+                      ))}
+                      {demoResult.reportProject.reports.filter(r => r.type === "summary").length === 0 && (
+                        <div className="text-center py-6 text-surface-500 text-sm">No summary reports generated.</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Detail Reports */}
+                  {reportsExpandedSection === "detail" && (
+                    <div className="space-y-3">
+                      {demoResult.reportProject.reports.filter(r => r.type === "detail").map((r, i) => (
+                        <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">📄</span>
+                              <h3 className="text-sm font-semibold text-surface-200 font-mono">{r.name}</h3>
+                              <span className="text-[10px] font-medium text-blue-500/70 uppercase tracking-wider bg-blue-500/10 px-2 py-0.5 rounded">{r.entity}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => { navigator.clipboard.writeText(r.sql).then(() => { setReportsCopied(`sql-det-${i}`); setTimeout(() => setReportsCopied(null), 2000); }).catch(() => {}); }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                              >
+                                {reportsCopied === `sql-det-${i}` ? <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</> : <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy SQL</>}
+                              </button>
+                              <button
+                                onClick={() => { navigator.clipboard.writeText(r.tsCode).then(() => { setReportsCopied(`ts-det-${i}`); setTimeout(() => setReportsCopied(null), 2000); }).catch(() => {}); }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                              >
+                                {reportsCopied === `ts-det-${i}` ? <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</> : <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy TS</>}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="px-5 py-3 border-b border-white/5">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">SQL Query</h4>
+                            <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto"><code>{r.sql}</code></pre>
+                          </div>
+                          <div className="px-5 py-3">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">TypeScript Module</h4>
+                            <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{r.tsCode.length > 2000 ? r.tsCode.slice(0, 2000) + '\n\n// ... (truncated, full code in download ZIP)' : r.tsCode}</code></pre>
+                          </div>
+                        </div>
+                      ))}
+                      {demoResult.reportProject.reports.filter(r => r.type === "detail").length === 0 && (
+                        <div className="text-center py-6 text-surface-500 text-sm">No detail reports generated.</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Cross-Entity Dashboard Reports */}
+                  {reportsExpandedSection === "dashboard" && (
+                    <div className="space-y-3">
+                      {demoResult.reportProject.reports.filter(r => r.type === "dashboard").map((r, i) => (
+                        <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">📊</span>
+                              <h3 className="text-sm font-semibold text-surface-200 font-mono">{r.name}</h3>
+                              <span className="text-[10px] font-medium text-amber-500/70 uppercase tracking-wider bg-amber-500/10 px-2 py-0.5 rounded">All Entities</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => { navigator.clipboard.writeText(r.sql).then(() => { setReportsCopied(`sql-dash-${i}`); setTimeout(() => setReportsCopied(null), 2000); }).catch(() => {}); }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                              >
+                                {reportsCopied === `sql-dash-${i}` ? <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</> : <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy SQL</>}
+                              </button>
+                              <button
+                                onClick={() => { navigator.clipboard.writeText(r.tsCode).then(() => { setReportsCopied(`ts-dash-${i}`); setTimeout(() => setReportsCopied(null), 2000); }).catch(() => {}); }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                              >
+                                {reportsCopied === `ts-dash-${i}` ? <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</> : <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy TS</>}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="px-5 py-3 border-b border-white/5">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">SQL Query</h4>
+                            <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto"><code>{r.sql}</code></pre>
+                          </div>
+                          <div className="px-5 py-3">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">TypeScript Module</h4>
+                            <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{r.tsCode.length > 2000 ? r.tsCode.slice(0, 2000) + '\n\n// ... (truncated, full code in download ZIP)' : r.tsCode}</code></pre>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Scheduled Reports */}
+                  {reportsExpandedSection === "scheduled" && demoResult.reportProject.scheduledConfig && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="px-5 py-3 border-b border-white/5">
+                          <h3 className="text-sm font-semibold text-surface-200 flex items-center gap-2">
+                            <span>📅</span>Scheduled Reports Configuration
+                          </h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-white/5 bg-surface-900/70">
+                                <th className="text-left px-5 py-2.5 font-semibold text-surface-400 uppercase tracking-wider">Report Name</th>
+                                <th className="text-left px-5 py-2.5 font-semibold text-surface-400 uppercase tracking-wider">Entity</th>
+                                <th className="text-left px-5 py-2.5 font-semibold text-surface-400 uppercase tracking-wider">Schedule</th>
+                                <th className="text-left px-5 py-2.5 font-semibold text-surface-400 uppercase tracking-wider">Format</th>
+                                <th className="text-left px-5 py-2.5 font-semibold text-surface-400 uppercase tracking-wider">Recipients</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {demoResult.reportProject.scheduledConfig.map((sc, i) => (
+                                <tr key={i} className="border-b border-white/5 last:border-0">
+                                  <td className="px-5 py-2.5 text-surface-300 font-medium">{sc.name}</td>
+                                  <td className="px-5 py-2.5 text-surface-400">{sc.entity}</td>
+                                  <td className="px-5 py-2.5">
+                                    <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
+                                      sc.schedule === "daily" ? "text-green-400 bg-green-500/10" :
+                                      sc.schedule === "weekly" ? "text-blue-400 bg-blue-500/10" :
+                                      "text-purple-400 bg-purple-500/10"
+                                    }`}>{sc.schedule}</span>
+                                  </td>
+                                  <td className="px-5 py-2.5">
+                                    <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded text-amber-400 bg-amber-500/10">{sc.format}</span>
+                                  </td>
+                                  <td className="px-5 py-2.5 text-surface-400 font-mono text-[11px]">{sc.recipients.join(", ")}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="px-5 py-3 border-t border-white/5">
+                          <button
+                            onClick={() => {
+                              const json = demoResult.scheduledConfigJson || JSON.stringify(demoResult.reportProject.scheduledConfig, null, 2);
+                              navigator.clipboard.writeText(json).then(() => {
+                                setReportsCopied("sched-config");
+                                setTimeout(() => setReportsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {reportsCopied === "sched-config" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy JSON</>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Report Runner */}
+                  {reportsExpandedSection === "runner" && demoResult.reportRunner && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">⚡</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">report-runner.ts</h3>
+                            <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">Executes all generated reports</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.reportRunner || "").then(() => {
+                                setReportsCopied("runner-ts");
+                                setTimeout(() => setReportsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {reportsCopied === "runner-ts" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="px-5 py-3">
+                          <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{demoResult.reportRunner.length > 3000 ? demoResult.reportRunner.slice(0, 3000) + '\n\n// ... (truncated, full code in download ZIP)' : demoResult.reportRunner}</code></pre>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 p-4">
+                        <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Report Runner API</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {[
+                            { fn: "runReport(db, name)", desc: "Execute a single report by name" },
+                            { fn: "runAllReports(db)", desc: "Execute all registered reports" },
+                            { fn: "runScheduled(db, schedule)", desc: "Run reports for daily/weekly/monthly" },
+                            { fn: "getReportsDue(schedule)", desc: "List reports due for a schedule" },
+                          ].map((api, i) => (
+                            <div key={i} className="rounded-lg bg-surface-950/70 px-3 py-2">
+                              <code className="text-xs font-mono text-brand-400">{api.fn}</code>
+                              <p className="text-[11px] text-surface-500 mt-0.5">{api.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 rounded-xl border border-green-500/20 bg-green-500/5 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-500/10 text-lg">📊</span>
+                    <div>
+                      <h4 className="text-sm font-semibold text-green-300">Report System Complete</h4>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        {demoResult.reportProject.reports.length} reports &middot; {demoResult.reportProject.scheduledConfig.length} schedules &mdash;
+                        SQL queries &middot; CSV/JSON/PDF exports &middot; Self-contained TypeScript modules
                       </p>
                     </div>
                   </div>
