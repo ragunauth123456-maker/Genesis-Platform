@@ -129,7 +129,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows" | "reports" | "permissions";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows" | "reports" | "permissions" | "notifications";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -206,6 +206,8 @@ function Home() {
   const [reportsCopied, setReportsCopied] = useState<string | null>(null);
   const [permissionsExpandedSection, setPermissionsExpandedSection] = useState<string>("roles");
   const [permissionsCopied, setPermissionsCopied] = useState<string | null>(null);
+  const [notificationsExpandedSection, setNotificationsExpandedSection] = useState<string>("templates");
+  const [notificationsCopied, setNotificationsCopied] = useState<string | null>(null);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -826,6 +828,7 @@ function Home() {
                     ...(demoResult.workflowProject ? [["workflows", "Workflows 🔄"]] as [ResultTab, string][] : []),
                     ...(demoResult.reportProject ? [["reports", "Reports 📊"]] as [ResultTab, string][] : []),
                     ...(demoResult.permissionProject ? [["permissions", "Permissions 🔐"]] as [ResultTab, string][] : []),
+                    ...(demoResult.notificationProject ? [["notifications", "Notifications 🔔"]] as [ResultTab, string][] : []),
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -3510,6 +3513,263 @@ ${demoResult.components.map((c) => `        ├── ${c.name}.tsx`).join("\n")
                   )}
                 </div>
               )}
+
+
+              {/* Tab Content: Notifications */}
+              {activeTab === "notifications" && demoResult.notificationProject && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-lg">🔔</span>
+                    <div>
+                      <h4 className="text-sm font-semibold text-blue-300">Notification System</h4>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        {demoResult.notificationProject.emailTemplates.length} email templates &middot; NotificationService &middot; NotificationCenter UI &middot; TypeScript types &middot; Store
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/70 p-1 overflow-x-auto">
+                    {[
+                      ["templates", "📧 Email Templates"],
+                      ["service", "⚡ Notification Service"],
+                      ["center", "🛎️ Notification Center"],
+                      ["types", "📐 Types & Store"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setNotificationsExpandedSection(key)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+                          notificationsExpandedSection === key
+                            ? "bg-surface-800 text-white shadow-sm"
+                            : "text-surface-400 hover:text-surface-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Email Templates */}
+                  {notificationsExpandedSection === "templates" && (
+                    <div className="space-y-4">
+                      {demoResult.notificationProject.emailTemplates.map((template, idx) => (
+                        <div key={idx} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">
+                                {idx === 0 ? "👋" : idx === 1 ? "🔄" : idx === 2 ? "⚠️" : "📊"}
+                              </span>
+                              <div>
+                                <h3 className="text-sm font-semibold text-surface-200">{template.name}</h3>
+                                <p className="text-xs text-surface-500 font-mono mt-0.5">{template.subject}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(template.html).then(() => {
+                                  setNotificationsCopied("html-" + idx);
+                                  setTimeout(() => setNotificationsCopied(null), 2000);
+                                }).catch(() => {});
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                            >
+                              {notificationsCopied === "html-" + idx ? (
+                                <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                              ) : (
+                                <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy HTML</>
+                              )}
+                            </button>
+                          </div>
+                          <div className="px-5 py-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">HTML Preview</span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(template.text).then(() => {
+                                    setNotificationsCopied("text-" + idx);
+                                    setTimeout(() => setNotificationsCopied(null), 2000);
+                                  }).catch(() => {});
+                                }}
+                                className="inline-flex items-center gap-1 rounded bg-surface-800 px-2 py-1 text-[10px] font-medium text-surface-400 transition-all hover:bg-surface-700 hover:text-surface-200"
+                              >
+                                {notificationsCopied === "text-" + idx ? "✓ Copied" : "Copy Text"}
+                              </button>
+                            </div>
+                            <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto"><code>{template.html.length > 2000 ? template.html.slice(0, 2000) : template.html}</code></pre>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Notification Service */}
+                  {notificationsExpandedSection === "service" && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">⚡</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">NotificationService.ts</h3>
+                            <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">TypeScript class</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.notificationProject?.notificationService || "").then(() => {
+                                setNotificationsCopied("service");
+                                setTimeout(() => setNotificationsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {notificationsCopied === "service" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="px-5 py-3">
+                          <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{(demoResult.notificationProject?.notificationService || "").length > 4000 ? (demoResult.notificationProject?.notificationService || "").slice(0, 4000) : (demoResult.notificationProject?.notificationService || "")}</code></pre>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 p-4">
+                        <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Service API</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {[
+                            { fn: "sendEmail(options)", desc: "Send email via Resend/SendGrid/SMTP/SES" },
+                            { fn: "sendPush(options)", desc: "Push via FCM/APNs/Web Push" },
+                            { fn: "sendInApp(options)", desc: "In-app notification with WS/SSE broadcast" },
+                            { fn: "dispatchWebhook(payload)", desc: "Slack, Teams, Discord, custom webhooks" },
+                            { fn: "enqueue(type, payloads)", desc: "Batch queue with concurrency control" },
+                            { fn: "markAllRead(userId)", desc: "Mark all notifications as read" },
+                          ].map((api, i) => (
+                            <div key={i} className="rounded-lg bg-surface-950/70 px-3 py-2">
+                              <code className="text-xs font-mono text-brand-400">{api.fn}</code>
+                              <p className="text-[11px] text-surface-500 mt-0.5">{api.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notification Center */}
+                  {notificationsExpandedSection === "center" && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">🛎️</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">NotificationCenter.tsx</h3>
+                            <span className="text-[10px] font-medium text-purple-500/70 uppercase tracking-wider bg-purple-500/10 px-2 py-0.5 rounded">React component</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.notificationProject?.notificationCenter || "").then(() => {
+                                setNotificationsCopied("center");
+                                setTimeout(() => setNotificationsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {notificationsCopied === "center" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="px-5 py-3">
+                          <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{(demoResult.notificationProject?.notificationCenter || "").length > 4000 ? (demoResult.notificationProject?.notificationCenter || "").slice(0, 4000) : (demoResult.notificationProject?.notificationCenter || "")}</code></pre>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 p-4">
+                        <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Component Features</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {[
+                            { fn: "BellIcon + unread badge", desc: "Animated pulsing badge with count" },
+                            { fn: "Dropdown notification list", desc: "Scrollable list with time-ago formatting" },
+                            { fn: "Mark as read / Mark all read", desc: "Individual and bulk read actions" },
+                            { fn: "Filter by type", desc: "All, Unread, Info, Warning, Success, Error" },
+                            { fn: "Delete notifications", desc: "Click delete with animation" },
+                            { fn: "Dark-themed Tailwind CSS", desc: "Matches the app's dark theme" },
+                            { fn: "Click-to-navigate", desc: "Notifications link to relevant pages" },
+                            { fn: "Keyboard accessible", desc: "Escape to close, outside click handling" },
+                          ].map((api, i) => (
+                            <div key={i} className="rounded-lg bg-surface-950/70 px-3 py-2">
+                              <code className="text-xs font-mono text-brand-400">{api.fn}</code>
+                              <p className="text-[11px] text-surface-500 mt-0.5">{api.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Types & Store */}
+                  {notificationsExpandedSection === "types" && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">📐</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">notification-types.ts</h3>
+                            <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">TypeScript interfaces</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.notificationProject?.notificationTypes || "").then(() => {
+                                setNotificationsCopied("types");
+                                setTimeout(() => setNotificationsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {notificationsCopied === "types" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="px-5 py-3">
+                          <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{(demoResult.notificationProject?.notificationTypes || "").length > 3000 ? (demoResult.notificationProject?.notificationTypes || "").slice(0, 3000) : (demoResult.notificationProject?.notificationTypes || "")}</code></pre>
+                        </div>
+                      </div>
+
+                      {/* Notification Store */}
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">📦</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">notification-store.ts</h3>
+                            <span className="text-[10px] font-medium text-green-500/70 uppercase tracking-wider bg-green-500/10 px-2 py-0.5 rounded">Zustand/React</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.notificationProject?.notificationStore || "").then(() => {
+                                setNotificationsCopied("store");
+                                setTimeout(() => setNotificationsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {notificationsCopied === "store" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="px-5 py-3">
+                          <pre className="overflow-x-auto rounded-lg bg-surface-950 p-3 text-xs text-surface-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"><code>{(demoResult.notificationProject?.notificationStore || "").length > 3000 ? (demoResult.notificationProject?.notificationStore || "").slice(0, 3000) : (demoResult.notificationProject?.notificationStore || "")}</code></pre>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
 
 {/* "What's next?" CTA */}
               <div className="rounded-2xl border border-white/10 bg-surface-900/70 p-6 text-center">
