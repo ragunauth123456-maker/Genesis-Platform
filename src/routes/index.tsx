@@ -129,7 +129,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -200,6 +200,8 @@ function Home() {
   const [dashboardCopied, setDashboardCopied] = useState(false);
   const [deployExpandedSection, setDeployExpandedSection] = useState<string>("dockerfile");
   const [deployCopied, setDeployCopied] = useState<string | null>(null);
+  const [workflowsExpandedSection, setWorkflowsExpandedSection] = useState<string>("stateMachines");
+  const [workflowsCopied, setWorkflowsCopied] = useState<string | null>(null);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -2596,6 +2598,298 @@ ${demoResult.components.map((c) => `        ├── ${c.name}.tsx`).join("\n")
                       <p className="text-xs text-surface-400 mt-0.5">
                         Docker • Docker Compose • Fly.io • GitHub Actions CI/CD • deploy.sh —
                         Ready to deploy with <code className="text-brand-400">./deploy.sh deploy</code>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
+              {/* Tab Content: Workflows */}
+              {activeTab === "workflows" && demoResult.workflowProject && (
+                <div className="space-y-4">
+                  <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/70 p-1 overflow-x-auto">
+                    {[
+                      ["stateMachines", "🔄 State Machines"],
+                      ["approvalFlows", "✅ Approval Flows"],
+                      ["processFlows", "📋 Process Flows"],
+                      ["workflowEngine", "⚙️ Workflow Engine"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setWorkflowsExpandedSection(key)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+                          workflowsExpandedSection === key
+                            ? "bg-surface-800 text-white shadow-sm"
+                            : "text-surface-400 hover:text-surface-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* State Machines accordion */}
+                  {workflowsExpandedSection === "stateMachines" && (
+                    <div className="space-y-3">
+                      {demoResult.workflowProject.stateMachines.map((sm, i) => (
+                        <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">🔄</span>
+                              <h3 className="text-sm font-semibold text-surface-200 font-mono">{sm.entity} State Machine</h3>
+                              <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                                {sm.states.length} states &middot; {sm.transitions.length} transitions
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(sm.tsCode).then(() => {
+                                  setWorkflowsCopied(`sm-${i}`);
+                                  setTimeout(() => setWorkflowsCopied(null), 2000);
+                                }).catch(() => {});
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                            >
+                              {workflowsCopied === `sm-${i}` ? (
+                                <>
+                                  <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  Copy
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          {/* States */}
+                          <div className="px-5 py-3 border-b border-white/5">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">States</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {sm.states.map((state) => (
+                                <span key={state} className="inline-flex items-center rounded-md bg-surface-800 px-2.5 py-1 text-xs font-mono text-surface-300 border border-white/5">
+                                  {state}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          {/* Transitions */}
+                          <div className="px-5 py-3 border-b border-white/5">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Transitions</h4>
+                            <div className="space-y-1.5">
+                              {sm.transitions.map((t, j) => (
+                                <div key={j} className="flex items-center gap-2 text-xs font-mono">
+                                  <span className="text-surface-300">{t.from}</span>
+                                  <svg className="h-3 w-3 text-surface-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                  </svg>
+                                  <span className="text-surface-300">{t.to}</span>
+                                  {t.condition && (
+                                    <span className="text-surface-500 italic">({t.condition})</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {/* TypeScript Code */}
+                          <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                            <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                              <code>{sm.tsCode}</code>
+                            </pre>
+                          </div>
+                        </div>
+                      ))}
+                      {demoResult.workflowProject.stateMachines.length === 0 && (
+                        <div className="rounded-xl border border-white/5 bg-surface-900/50 p-8 text-center">
+                          <p className="text-sm text-surface-500">No state machines detected for this domain</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Approval Flows accordion */}
+                  {workflowsExpandedSection === "approvalFlows" && (
+                    <div className="space-y-3">
+                      {demoResult.workflowProject.approvalFlows.map((af, i) => (
+                        <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">✅</span>
+                              <h3 className="text-sm font-semibold text-surface-200 font-mono">{af.name}</h3>
+                              <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                                {af.steps.length} steps
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(af.tsCode).then(() => {
+                                  setWorkflowsCopied(`af-${i}`);
+                                  setTimeout(() => setWorkflowsCopied(null), 2000);
+                                }).catch(() => {});
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                            >
+                              {workflowsCopied === `af-${i}` ? (
+                                <>
+                                  <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  Copy
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          {/* Steps */}
+                          <div className="px-5 py-3 border-b border-white/5">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Steps</h4>
+                            <div className="space-y-1.5">
+                              {af.steps.map((step, j) => (
+                                <div key={j} className="flex items-center gap-2 text-xs">
+                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-800 text-[10px] font-semibold text-surface-400">
+                                    {j + 1}
+                                  </span>
+                                  <span className="text-surface-300">{step}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {/* Code */}
+                          <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                            <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                              <code>{af.tsCode}</code>
+                            </pre>
+                          </div>
+                        </div>
+                      ))}
+                      {demoResult.workflowProject.approvalFlows.length === 0 && (
+                        <div className="rounded-xl border border-white/5 bg-surface-900/50 p-8 text-center">
+                          <p className="text-sm text-surface-500">No approval flows configured for this domain</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Process Flows accordion */}
+                  {workflowsExpandedSection === "processFlows" && (
+                    <div className="space-y-3">
+                      {demoResult.workflowProject.processFlows.map((pf, i) => (
+                        <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">📋</span>
+                              <h3 className="text-sm font-semibold text-surface-200 font-mono">{pf.name}</h3>
+                              <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">Process Flow</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(pf.tsCode).then(() => {
+                                  setWorkflowsCopied(`pf-${i}`);
+                                  setTimeout(() => setWorkflowsCopied(null), 2000);
+                                }).catch(() => {});
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                            >
+                              {workflowsCopied === `pf-${i}` ? (
+                                <>
+                                  <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  Copy
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          {/* Description */}
+                          <div className="px-5 py-3 border-b border-white/5">
+                            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Description</h4>
+                            <p className="text-xs text-surface-300">{pf.description}</p>
+                          </div>
+                          {/* Code */}
+                          <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                            <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                              <code>{pf.tsCode}</code>
+                            </pre>
+                          </div>
+                        </div>
+                      ))}
+                      {demoResult.workflowProject.processFlows.length === 0 && (
+                        <div className="rounded-xl border border-white/5 bg-surface-900/50 p-8 text-center">
+                          <p className="text-sm text-surface-500">No process flows defined for this domain</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Workflow Engine */}
+                  {workflowsExpandedSection === "workflowEngine" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">⚙️</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">WorkflowEngine.ts</h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">TypeScript Runtime</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.workflowProject!.workflowEngine).then(() => {
+                              setWorkflowsCopied("engine");
+                              setTimeout(() => setWorkflowsCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {workflowsCopied === "engine" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.workflowProject.workflowEngine}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-lg">🔄</span>
+                    <div>
+                      <h4 className="text-sm font-semibold text-purple-300">Workflow System Complete</h4>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        State Machines &middot; Approval Flows &middot; Process Flows &middot; Reusable Engine &mdash;
+                        Ready to wire into <code className="text-brand-400">routes</code> and <code className="text-brand-400">middleware</code>
                       </p>
                     </div>
                   </div>

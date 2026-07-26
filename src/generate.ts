@@ -12,12 +12,14 @@ import { generateBackendProject } from "./backend-project";
 import { generateFrontendProject } from "./frontend-project";
 import { generateDashboard } from "./dashboard-generator";
 import { generateDeployment } from "./deployment-generator";
+import { generateWorkflows } from "./workflow-generator";
 import type { BackendProject } from "./backend-project";
 import type { FrontendProject } from "./frontend-project";
 import type { DashboardProject } from "./dashboard-generator";
 import type { DeploymentProject } from "./deployment-generator";
+import type { WorkflowProject } from "./workflow-generator";
 
-export type { BackendProject, FrontendProject, DashboardProject, DeploymentProject };
+export type { BackendProject, FrontendProject, DashboardProject, DeploymentProject, WorkflowProject };
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -79,6 +81,7 @@ export interface GenerationResult {
   frontendProject?: FrontendProject;
   dashboardProject?: DashboardProject;
   deploymentProject?: DeploymentProject;
+  workflowProject?: WorkflowProject;
 }
 
 // ── OpenAI generation (primary path) ────────────────────────────────────────
@@ -1845,8 +1848,9 @@ function attachSchemaArtifacts(result: GenerationResult): GenerationResult {
   const frontendProject = generateFrontendProject(result.entities, result.components, result.endpoints);
   const dashboardProject = generateDashboard(result.entities, result.endpoints, relationships);
   const deploymentProject = generateDeployment(result.entities, apiRoutes, result.domain);
+  const workflowProject = generateWorkflows(result.entities, result.endpoints, relationships);
 
-  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject, deploymentProject };
+  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject, deploymentProject, workflowProject };
 }
 
 // ── Main generation function ───────────────────────────────────────────────
