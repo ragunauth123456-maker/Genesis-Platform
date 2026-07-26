@@ -378,6 +378,12 @@ function Home() {
             >
               Waitlist
             </a>
+            <a
+              href="#pricing"
+              className="hidden sm:block text-surface-400 transition-colors hover:text-white"
+            >
+              Buy
+            </a>
             <button
               onClick={scrollToDemo}
               className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-400 hover:glow"
@@ -4249,6 +4255,112 @@ ${demoResult.components.map((c) => `        ├── ${c.name}.tsx`).join("\n")
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Pricing ─────────────────────────────────────────── */}
+      <section
+        id="pricing"
+        className="border-t border-white/5 px-6 py-24 sm:py-32"
+      >
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Get <span className="gradient-text">Genesis</span> Platform
+            </h2>
+            <p className="mt-4 text-surface-400 max-w-xl mx-auto">
+              Early access is available now. Lock in lifetime access at a one-time
+              price, or go Pro for unlimited everything.
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 max-w-3xl mx-auto">
+            {/* ── Early Access Card ── */}
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-surface-900/60 p-8 transition-all hover:border-white/20 hover:bg-surface-900">
+              <div className="mb-6">
+                <h3 className="text-xl font-bold">Early Access</h3>
+                <p className="mt-1 text-sm text-surface-400">
+                  One-time purchase, lifetime access
+                </p>
+              </div>
+
+              <div className="mb-8">
+                <span className="text-5xl font-extrabold tracking-tight">$49</span>
+                <span className="ml-2 text-surface-500">one-time</span>
+              </div>
+
+              <a
+                href="https://buy.stripe.com/3cIaEWcMkcBa59T3Q51kA0f"
+                className="block w-full rounded-xl bg-brand-500 px-6 py-3 text-center text-sm font-semibold text-white transition-all hover:bg-brand-400 hover:glow"
+              >
+                Buy Early Access
+              </a>
+
+              <ul className="mt-8 space-y-3">
+                {[
+                  "Lifetime access",
+                  "Generate complete enterprise applications",
+                  "Database + API + Backend + Frontend",
+                  "Dashboard + Workflows + RBAC",
+                  "Download full project as ZIP",
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm text-surface-300">
+                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* ── Pro Card ── */}
+            <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-b from-purple-500/5 to-transparent p-8 transition-all hover:border-purple-500/50">
+              {/* Gradient accent badge */}
+              <div className="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-purple-400 to-transparent" />
+              <div className="mb-6">
+                <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 mb-3">
+                  <span className="text-xs font-medium text-purple-300">Most Popular</span>
+                </div>
+                <h3 className="text-xl font-bold">Pro</h3>
+                <p className="mt-1 text-sm text-surface-400">
+                  For teams and power users
+                </p>
+              </div>
+
+              <div className="mb-8">
+                <span className="text-5xl font-extrabold tracking-tight">$199</span>
+                <span className="ml-2 text-surface-500">/month</span>
+              </div>
+
+              <a
+                href="https://buy.stripe.com/5kQ7sK7s0dFedGp1HX1kA0g"
+                className="block w-full rounded-xl bg-purple-500 px-6 py-3 text-center text-sm font-semibold text-white transition-all hover:bg-purple-400 hover:glow-strong"
+              >
+                Buy Pro
+              </a>
+
+              <ul className="mt-8 space-y-3">
+                {[
+                  "Everything in Early Access",
+                  "Unlimited generations",
+                  "Priority support",
+                  "Early access to new generators",
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm text-surface-300">
+                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <p className="mt-8 text-center text-xs text-surface-600">
+            Secure payment powered by Stripe. You'll be redirected to complete your purchase.
+          </p>
         </div>
       </section>
 
