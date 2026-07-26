@@ -35,12 +35,23 @@ export interface GeneratedComponent {
   children?: GeneratedComponent[];
 }
 
+export interface Relationship {
+  from: string;
+  to: string;
+  type: "one-to-many" | "many-to-one" | "many-to-many";
+  foreignKey: string;
+  junctionTable?: string;
+}
+
 export interface GenerationResult {
   summary: string;
   domain: string;
   entities: GeneratedEntity[];
   endpoints: GeneratedEndpoint[];
   components: GeneratedComponent[];
+  relationships: Relationship[];
+  sql: string;
+  erDiagram: string;
 }
 
 // ── OpenAI generation (primary path) ────────────────────────────────────────
@@ -154,6 +165,9 @@ async function generateWithOpenAI(input: string): Promise<GenerationResult> {
             : undefined,
         }))
       : [],
+    relationships: [],
+    sql: "",
+    erDiagram: "",
   };
 }
 
@@ -952,7 +966,305 @@ function generateWithFallback(input: string): GenerationResult {
     entities: allEntities.slice(0, 8),
     endpoints: allEndpoints.slice(0, 16),
     components,
+    relationships: [],
+    sql: "",
+    erDiagram: "",
   };
+}
+
+// ── Relationship Inference Engine ──────────────────────────────────────────
+
+/**
+ * Maps a field type string (as seen in GeneratedField.type) to a SQL column type.
+ * Handles FK annotations like "UUID → Guest".
+ */
+function mapFieldType(type: string): string {
+  const lower = type.toLowerCase().trim();
+
+  // FK references: UUID → EntityName — the column itself is UUID
+  if (/^uuid\s*→/.test(lower)) return "UUID";
+
+  if (lower === "uuid") return "UUID";
+  if (lower === "string" || lower === "email") return "VARCHAR(255)";
+  if (lower === "text") return "TEXT";
+  if (lower === "integer" || lower === "int" || lower === "number") return "INTEGER";
+  if (lower === "decimal" || lower === "float" || lower === "double") return "DECIMAL(10,2)";
+  if (lower === "boolean" || lower === "bool") return "BOOLEAN";
+  if (lower === "date") return "DATE";
+  if (lower === "datetime" || lower === "timestamp") return "TIMESTAMPTZ";
+  if (lower === "enum" || lower.startsWith("enum")) return "VARCHAR(255)";
+  if (lower === "json" || lower === "jsonb") return "JSONB";
+  if (lower === "string[]") return "TEXT[]";
+  if (lower.includes("[]")) return "JSONB";
+  if (lower.startsWith("uuid →")) return "UUID";
+  return "TEXT";
+}
+
+/**
+ * Analyzes entity field names and types to infer relationships between entities.
+ *
+ * Detection strategies:
+ * 1. Type-based: field type contains "UUID → EntityName"
+ * 2. Name-based: field name ends with "Id" or "_id" (e.g., guestId → Guest)
+ * 3. Junction-table: an entity with exactly 2 FK fields and ≤5 total fields
+ *    is treated as a many-to-many bridge between the two referenced entities.
+ */
+export function inferRelationships(entities: GeneratedEntity[]): Relationship[] {
+  const entityNames = new Set(entities.map((e) => e.name));
+  const entityNameLower = new Map<string, string>(); // lowercase → PascalCase
+  for (const e of entities) {
+    entityNameLower.set(e.name.toLowerCase(), e.name);
+  }
+
+  // First pass: collect all individual FK relationships
+  interface RawFK {
+    owningEntity: string;
+    fieldName: string;
+    targetEntity: string;
+  }
+
+  const rawFKs: RawFK[] = [];
+
+  for (const entity of entities) {
+    for (const field of entity.fields) {
+      let targetEntity: string | null = null;
+
+      // Strategy 1: type-based detection "UUID → EntityName"
+      const typeMatch = field.type.match(/UUID\s*→\s*(\w[\w\s]*\w)/i);
+      if (typeMatch) {
+        const candidate = typeMatch[1].trim();
+        if (entityNameLower.has(candidate.toLowerCase())) {
+          targetEntity = entityNameLower.get(candidate.toLowerCase())!;
+        }
+      }
+
+      // Strategy 2: name-based detection — field ends with "Id" or "_id"
+      if (!targetEntity) {
+        let base = "";
+        if (/_id$/i.test(field.name)) {
+          base = field.name.replace(/_id$/i, "");
+        } else if (/^[a-z].*Id$/i.test(field.name)) {
+          base = field.name.replace(/Id$/i, "");
+        }
+
+        if (base) {
+          // Try camelCase → PascalCase
+          const pascal = base.charAt(0).toUpperCase() + base.slice(1);
+          if (entityNameLower.has(base.toLowerCase())) {
+            targetEntity = entityNameLower.get(base.toLowerCase())!;
+          } else if (entityNameLower.has(pascal.toLowerCase())) {
+            targetEntity = entityNameLower.get(pascal.toLowerCase())!;
+          } else {
+            // Try matching against entity names ignoring case
+            for (const en of entityNames) {
+              if (en.toLowerCase() === base.toLowerCase()) {
+                targetEntity = en;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (targetEntity && targetEntity !== entity.name) {
+        rawFKs.push({
+          owningEntity: entity.name,
+          fieldName: field.name,
+          targetEntity,
+        });
+      }
+    }
+  }
+
+  // Second pass: detect junction tables and build final relationship list
+  const junctionEntities = new Set<string>();
+  const relationships: Relationship[] = [];
+
+  for (const entity of entities) {
+    const entityFKs = rawFKs.filter((fk) => fk.owningEntity === entity.name);
+    const nonPKFields = entity.fields.filter(
+      (f) => f.name !== "id" && f.name !== "created_at" && f.name !== "createdAt" && f.name !== "updated_at" && f.name !== "updatedAt"
+    );
+
+    // Junction table: exactly 2 FK fields and ≤5 total non-meta fields
+    if (entityFKs.length === 2 && nonPKFields.length <= 5) {
+      const [fkA, fkB] = entityFKs;
+      // Mark this entity as a junction
+      junctionEntities.add(entity.name);
+
+      // Add a many-to-many relationship between the two target entities
+      relationships.push({
+        from: fkA.targetEntity,
+        to: fkB.targetEntity,
+        type: "many-to-many",
+        foreignKey: `${fkA.fieldName},${fkB.fieldName}`,
+        junctionTable: entity.name,
+      });
+    }
+  }
+
+  // Add non-junction relationships
+  for (const fk of rawFKs) {
+    if (junctionEntities.has(fk.owningEntity)) continue;
+
+    // owningEntity has FK to targetEntity
+    // → targetEntity (one) to owningEntity (many): one-to-many
+    relationships.push({
+      from: fk.targetEntity,
+      to: fk.owningEntity,
+      type: "one-to-many",
+      foreignKey: fk.fieldName,
+    });
+  }
+
+  // Deduplicate
+  const seen = new Set<string>();
+  return relationships.filter((r) => {
+    const key = `${r.from}|${r.to}|${r.type}|${r.foreignKey}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// ── SQL DDL Generator ──────────────────────────────────────────────────────
+
+/**
+ * Generates PostgreSQL-compatible DDL from entities and inferred relationships.
+ */
+export function generateSQL(
+  entities: GeneratedEntity[],
+  relationships: Relationship[]
+): string {
+  const lines: string[] = [];
+  const tableNames = new Set(entities.map((e) => e.name.toLowerCase()));
+
+  for (const entity of entities) {
+    const tableName = entity.name.toLowerCase();
+    const columns: string[] = [];
+    const fkConstraints: string[] = [];
+
+    for (const field of entity.fields) {
+      // Skip if already handled as FK with a different name
+      const sqlType = mapFieldType(field.type);
+      const notNull = field.required ? " NOT NULL" : "";
+
+      if (field.name === "id") {
+        columns.push(`  id UUID PRIMARY KEY DEFAULT gen_random_uuid()`);
+        continue;
+      }
+
+      // Check if this field is a foreign key
+      const rel = relationships.find(
+        (r) =>
+          r.foreignKey === field.name &&
+          r.to.toLowerCase() === entity.name.toLowerCase()
+      );
+
+      if (rel && rel.type === "one-to-many") {
+        columns.push(`  ${field.name} UUID${notNull}`);
+        fkConstraints.push(
+          `  CONSTRAINT fk_${tableName}_${field.name} FOREIGN KEY (${field.name}) REFERENCES ${rel.from.toLowerCase()}(id)`
+        );
+      } else if (rel && rel.type === "many-to-many") {
+        // For junction tables, FK is a comma-separated pair
+        const fkParts = rel.foreignKey.split(",");
+        for (const fkPart of fkParts) {
+          const trimmed = fkPart.trim();
+          if (trimmed === field.name) {
+            columns.push(`  ${field.name} UUID${notNull}`);
+            // Find the target table for this FK
+            const otherFKs = fkParts.filter((p) => p.trim() !== field.name);
+            // Determine which target entity this FK points to
+            const targetA = rel.from.toLowerCase();
+            const targetB = rel.to.toLowerCase();
+            // The FK name should help: guest_id → Guest, booking_id → Booking
+            const fkBase = trimmed.replace(/_id$/i, "").replace(/Id$/i, "");
+            let refTable: string;
+            if (fkBase.toLowerCase() === targetA || fkBase === rel.from) {
+              refTable = targetA;
+            } else if (fkBase.toLowerCase() === targetB || fkBase === rel.to) {
+              refTable = targetB;
+            } else {
+              refTable = targetA; // fallback
+            }
+            fkConstraints.push(
+              `  CONSTRAINT fk_${tableName}_${trimmed} FOREIGN KEY (${trimmed}) REFERENCES ${refTable}(id)`
+            );
+          }
+        }
+      } else {
+        columns.push(`  ${field.name} ${sqlType}${notNull}`);
+      }
+    }
+
+    // Add timestamps
+    columns.push("  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
+    columns.push("  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
+
+    const allColumns = [...columns, ...fkConstraints];
+    lines.push(`CREATE TABLE ${tableName} (`);
+    lines.push(allColumns.join(",\n"));
+    lines.push(");\n");
+  }
+
+  return lines.join("\n");
+}
+
+// ── ER Diagram Generator (Mermaid.js) ──────────────────────────────────────
+
+/**
+ * Produces a Mermaid.js erDiagram string for visual ER rendering.
+ */
+export function generateERDiagram(
+  entities: GeneratedEntity[],
+  relationships: Relationship[]
+): string {
+  const lines: string[] = ["erDiagram"];
+
+  // Emit entities with their fields
+  for (const entity of entities) {
+    const entityName = entity.name;
+    lines.push(`  ${entityName} {`);
+    for (const field of entity.fields) {
+      const sqlType = mapFieldType(field.type);
+      const pkSuffix = field.name === "id" ? " PK" : "";
+      const fkSuffix = relationships.some(
+        (r) =>
+          r.foreignKey.includes(field.name) &&
+          r.type !== "many-to-many" &&
+          r.to === entityName
+      )
+        ? " FK"
+        : "";
+      lines.push(`    ${sqlType} ${field.name}${pkSuffix}${fkSuffix}`);
+    }
+    lines.push("  }\n");
+  }
+
+  // Emit relationships
+  for (const rel of relationships) {
+    if (rel.type === "one-to-many") {
+      // from (one) ||--o{ to (many)
+      lines.push(`  ${rel.from} ||--o{ ${rel.to} : "has"`);
+    } else if (rel.type === "many-to-one") {
+      lines.push(`  ${rel.from} }o--|| ${rel.to} : "belongs to"`);
+    } else if (rel.type === "many-to-many") {
+      // Many-to-many: both sides have many
+      lines.push(`  ${rel.from} }o--o{ ${rel.to} : "many-to-many"`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+// ── Pipeline: attach relationships, SQL, and ER diagram to a result ───────
+
+function attachSchemaArtifacts(result: GenerationResult): GenerationResult {
+  const relationships = inferRelationships(result.entities);
+  const sql = generateSQL(result.entities, relationships);
+  const erDiagram = generateERDiagram(result.entities, relationships);
+  return { ...result, relationships, sql, erDiagram };
 }
 
 // ── Main generation function ───────────────────────────────────────────────
@@ -960,12 +1272,13 @@ function generateWithFallback(input: string): GenerationResult {
 export async function generateBlueprint(input: string): Promise<GenerationResult> {
   // Try OpenAI first; fall back to keyword matching on any failure
   try {
-    return await generateWithOpenAI(input);
+    const result = await generateWithOpenAI(input);
+    return attachSchemaArtifacts(result);
   } catch (err) {
     // Log the error for debugging but don't expose to the user
     const message = err instanceof Error ? err.message : String(err);
     console.warn("[generate] OpenAI generation failed, using fallback:", message);
-    return generateWithFallback(input);
+    return attachSchemaArtifacts(generateWithFallback(input));
   }
 }
 

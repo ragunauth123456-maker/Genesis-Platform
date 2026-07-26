@@ -62,6 +62,7 @@ function RootDocument({ children }: { children: ReactNode }) {
     <html lang="en" className="scroll-smooth">
       <head>
         <HeadContent />
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
       </head>
       <body className="font-sans">
         {children}

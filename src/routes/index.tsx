@@ -118,7 +118,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components";
+type ResultTab = "entities" | "endpoints" | "components" | "schema";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -177,6 +177,7 @@ function Home() {
   >("idle");
   const [waitlistMessage, setWaitlistMessage] = useState("");
   const [scrolled, setScrolled] = useState(false);
+  const [sqlCopied, setSqlCopied] = useState(false);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -186,6 +187,49 @@ function Home() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Render Mermaid ER diagram when the schema tab becomes active
+  useEffect(() => {
+    if (activeTab === "schema" && demoResult?.erDiagram) {
+      const container = document.getElementById("er-diagram-container");
+      if (!container) return;
+
+      const renderDiagram = async () => {
+        try {
+          const mermaid = (window as any).mermaid;
+          if (!mermaid) {
+            // Mermaid CDN hasn't loaded yet — retry
+            setTimeout(renderDiagram, 200);
+            return;
+          }
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: "dark",
+            themeVariables: {
+              primaryColor: "#6366f1",
+              primaryTextColor: "#e2e8f0",
+              primaryBorderColor: "#4f46e5",
+              lineColor: "#818cf8",
+              secondaryColor: "#1e293b",
+              tertiaryColor: "#0f172a",
+            },
+          });
+          // Use a unique ID each time to avoid cached render
+          const id = "er-diagram-" + Date.now();
+          const { svg } = await mermaid.render(id, demoResult.erDiagram);
+          container.innerHTML = svg;
+        } catch (err) {
+          console.warn("Mermaid render failed:", err);
+          container.innerHTML =
+            '<p class="text-surface-500 text-sm p-4">Could not render ER diagram. The SQL DDL is available below.</p>';
+        }
+      };
+
+      // Small delay to ensure the DOM is ready
+      const timer = setTimeout(renderDiagram, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, demoResult]);
 
   const scrollToDemo = () => {
     demoRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -671,6 +715,7 @@ function Home() {
                     ["entities", `Entities (${demoResult.entities.length})`],
                     ["endpoints", `API Endpoints (${demoResult.endpoints.length})`],
                     ["components", `Components (${demoResult.components.length})`],
+                    ["schema", "Database Schema"],
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -873,6 +918,118 @@ function Home() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Tab Content: Database Schema */}
+              {activeTab === "schema" && (
+                <div className="space-y-6">
+                  {/* ER Diagram */}
+                  <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                      <h3 className="text-sm font-semibold text-surface-200">
+                        Entity Relationship Diagram
+                      </h3>
+                      <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                        {demoResult.relationships.length} relationships
+                      </span>
+                    </div>
+                    <div
+                      id="er-diagram-container"
+                      className="p-4 flex justify-center overflow-x-auto"
+                    >
+                      <div className="flex items-center justify-center h-40 text-surface-500 text-sm">
+                        Loading diagram...
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SQL DDL */}
+                  <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                      <h3 className="text-sm font-semibold text-surface-200">
+                        SQL DDL (PostgreSQL)
+                      </h3>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(demoResult.sql).then(() => {
+                            setSqlCopied(true);
+                            setTimeout(() => setSqlCopied(false), 2000);
+                          }).catch(() => {});
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                      >
+                        {sqlCopied ? (
+                          <>
+                            <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy SQL
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <pre className="p-5 text-sm font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                        <code>{demoResult.sql}</code>
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* Relationships list */}
+                  {demoResult.relationships.length > 0 && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-white/5">
+                        <h3 className="text-sm font-semibold text-surface-200">
+                          Inferred Relationships
+                        </h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-white/5 bg-surface-900/70">
+                              <th className="px-5 py-2.5 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">From</th>
+                              <th className="px-5 py-2.5 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Type</th>
+                              <th className="px-5 py-2.5 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">To</th>
+                              <th className="px-5 py-2.5 text-left text-xs font-medium text-surface-500 uppercase tracking-wider hidden sm:table-cell">Foreign Key</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {demoResult.relationships.map((rel, i) => (
+                              <tr key={i} className="border-b border-white/[0.02] transition-colors hover:bg-white/[0.02]">
+                                <td className="px-5 py-2.5 font-medium text-surface-200">{rel.from}</td>
+                                <td className="px-5 py-2.5">
+                                  <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ${
+                                    rel.type === "one-to-many"
+                                      ? "bg-blue-500/10 text-blue-400"
+                                      : rel.type === "many-to-one"
+                                        ? "bg-amber-500/10 text-amber-400"
+                                        : "bg-purple-500/10 text-purple-400"
+                                  }`}>
+                                    {rel.type}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-2.5 font-medium text-surface-200">{rel.to}</td>
+                                <td className="px-5 py-2.5 font-mono text-xs text-surface-400 hidden sm:table-cell">
+                                  {rel.foreignKey}
+                                  {rel.junctionTable && (
+                                    <span className="text-surface-600 ml-1">via {rel.junctionTable}</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
