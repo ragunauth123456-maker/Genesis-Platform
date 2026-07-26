@@ -118,7 +118,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -179,6 +179,8 @@ function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [sqlCopied, setSqlCopied] = useState(false);
   const [apiRoutesCopied, setApiRoutesCopied] = useState(false);
+  const [dbExpandedSection, setDbExpandedSection] = useState<string>("docker");
+  const [dbCopied, setDbCopied] = useState<string | null>(null);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -710,7 +712,7 @@ function Home() {
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/50 p-1">
+              <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/50 p-1 overflow-x-auto">
                 {(
                   [
                     ["entities", `Entities (${demoResult.entities.length})`],
@@ -718,6 +720,7 @@ function Home() {
                     ["components", `Components (${demoResult.components.length})`],
                     ["schema", "Database Schema"],
                     ...(demoResult.apiRoutes ? [["apiroutes", "API Routes"]] as [ResultTab, string][] : []),
+                    ...(demoResult.databaseProject ? [["database", "Database"]] as [ResultTab, string][] : []),
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -1077,6 +1080,331 @@ function Home() {
                     <pre className="p-5 text-sm font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
                       <code>{demoResult.apiRoutes}</code>
                     </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab Content: Database */}
+              {activeTab === "database" && demoResult.databaseProject && (
+                <div className="space-y-4">
+                  {/* Sub-section selector */}
+                  <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/70 p-1 overflow-x-auto">
+                    {[
+                      ["docker", "🐳 Docker"],
+                      ["migrations", "📄 Migrations"],
+                      ["connection", "🔌 Connection"],
+                      ["seed", "🌱 Seed Data"],
+                      ["migrate", "🔄 Migrate"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setDbExpandedSection(key)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+                          dbExpandedSection === key
+                            ? "bg-surface-800 text-white shadow-sm"
+                            : "text-surface-400 hover:text-surface-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Docker Compose */}
+                  {dbExpandedSection === "docker" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🐳</span>
+                          <h3 className="text-sm font-semibold text-surface-200">
+                            docker-compose.yml
+                          </h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                            PostgreSQL 16
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.databaseProject!.dockerCompose).then(() => {
+                              setDbCopied("docker");
+                              setTimeout(() => setDbCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {dbCopied === "docker" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.databaseProject.dockerCompose}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Migrations */}
+                  {dbExpandedSection === "migrations" && (
+                    <div className="space-y-4">
+                      {demoResult.databaseProject.migrations.map((mig, i) => (
+                        <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">📄</span>
+                              <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                                {mig.filename}
+                              </h3>
+                              <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                                Migration {i + 1}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(mig.content).then(() => {
+                                  setDbCopied(`mig-${i}`);
+                                  setTimeout(() => setDbCopied(null), 2000);
+                                }).catch(() => {});
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                            >
+                              {dbCopied === `mig-${i}` ? (
+                                <>
+                                  <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  Copy
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                              <code>{mig.content}</code>
+                            </pre>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Connection */}
+                  {dbExpandedSection === "connection" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🔌</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                            src/db/connection.ts
+                          </h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                            postgres pool
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.databaseProject!.connectionCode).then(() => {
+                              setDbCopied("connection");
+                              setTimeout(() => setDbCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {dbCopied === "connection" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.databaseProject.connectionCode}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Seed Data */}
+                  {dbExpandedSection === "seed" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🌱</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                            src/db/seed.ts
+                          </h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                            FK-aware
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.databaseProject!.seedCode).then(() => {
+                              setDbCopied("seed");
+                              setTimeout(() => setDbCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {dbCopied === "seed" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.databaseProject.seedCode}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Migrate */}
+                  {dbExpandedSection === "migrate" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🔄</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                            src/db/migrate.ts
+                          </h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                            runner
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.databaseProject!.migrateCode).then(() => {
+                              setDbCopied("migrate");
+                              setTimeout(() => setDbCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {dbCopied === "migrate" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.databaseProject.migrateCode}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* .env.example summary */}
+                  <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">⚙️</span>
+                        <h3 className="text-sm font-semibold text-surface-200 font-mono">
+                          .env.example
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(demoResult.databaseProject!.envExample).then(() => {
+                            setDbCopied("env");
+                            setTimeout(() => setDbCopied(null), 2000);
+                          }).catch(() => {});
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                      >
+                        {dbCopied === "env" ? (
+                          <>
+                            <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                        <code>{demoResult.databaseProject.envExample}</code>
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* Summary badge */}
+                  <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-lg">
+                      🗄️
+                    </span>
+                    <div>
+                      <h4 className="text-sm font-semibold text-emerald-300">
+                        Complete Database Project
+                      </h4>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        {demoResult.databaseProject.migrations.length} migration(s) • Docker Compose • Connection pool •
+                        Seed data • Migration runner • Ready to run with <code className="text-brand-400">docker compose up</code>
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

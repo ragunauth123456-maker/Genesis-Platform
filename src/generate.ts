@@ -7,6 +7,8 @@
  * Fallback path: keyword-based domain matching for resilience when the API is unavailable.
  */
 
+import { generateDatabaseProject } from "./database-project";
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface GeneratedEntity {
@@ -43,6 +45,15 @@ export interface Relationship {
   junctionTable?: string;
 }
 
+export interface DatabaseProject {
+  migrations: { filename: string; content: string }[];
+  dockerCompose: string;
+  connectionCode: string;
+  seedCode: string;
+  migrateCode: string;
+  envExample: string;
+}
+
 export interface GenerationResult {
   summary: string;
   domain: string;
@@ -53,6 +64,7 @@ export interface GenerationResult {
   sql: string;
   erDiagram: string;
   apiRoutes: string;
+  databaseProject?: DatabaseProject;
 }
 
 // ── OpenAI generation (primary path) ────────────────────────────────────────
@@ -1811,7 +1823,10 @@ function attachSchemaArtifacts(result: GenerationResult): GenerationResult {
     result.endpoints,
     relationships
   );
-  return { ...result, relationships, sql, erDiagram, apiRoutes };
+
+  const databaseProject = generateDatabaseProject(result.entities, relationships, sql);
+
+  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject };
 }
 
 // ── Main generation function ───────────────────────────────────────────────
