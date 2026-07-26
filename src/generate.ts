@@ -11,11 +11,13 @@ import { generateDatabaseProject } from "./database-project";
 import { generateBackendProject } from "./backend-project";
 import { generateFrontendProject } from "./frontend-project";
 import { generateDashboard } from "./dashboard-generator";
+import { generateDeployment } from "./deployment-generator";
 import type { BackendProject } from "./backend-project";
 import type { FrontendProject } from "./frontend-project";
 import type { DashboardProject } from "./dashboard-generator";
+import type { DeploymentProject } from "./deployment-generator";
 
-export type { BackendProject, FrontendProject, DashboardProject };
+export type { BackendProject, FrontendProject, DashboardProject, DeploymentProject };
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -76,6 +78,7 @@ export interface GenerationResult {
   backendProject?: BackendProject;
   frontendProject?: FrontendProject;
   dashboardProject?: DashboardProject;
+  deploymentProject?: DeploymentProject;
 }
 
 // ── OpenAI generation (primary path) ────────────────────────────────────────
@@ -1841,8 +1844,9 @@ function attachSchemaArtifacts(result: GenerationResult): GenerationResult {
   const backendProject = generateBackendProject(result.entities, result.endpoints, apiRoutes);
   const frontendProject = generateFrontendProject(result.entities, result.components, result.endpoints);
   const dashboardProject = generateDashboard(result.entities, result.endpoints, relationships);
+  const deploymentProject = generateDeployment(result.entities, apiRoutes, result.domain);
 
-  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject };
+  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject, deploymentProject };
 }
 
 // ── Main generation function ───────────────────────────────────────────────

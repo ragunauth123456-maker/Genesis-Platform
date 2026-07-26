@@ -129,7 +129,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -198,6 +198,8 @@ function Home() {
   const [frontendCopied, setFrontendCopied] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [dashboardCopied, setDashboardCopied] = useState(false);
+  const [deployExpandedSection, setDeployExpandedSection] = useState<string>("dockerfile");
+  const [deployCopied, setDeployCopied] = useState<string | null>(null);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -814,6 +816,7 @@ function Home() {
                     ...(demoResult.backendProject ? [["backend", "Backend"]] as [ResultTab, string][] : []),
                     ...(demoResult.frontendProject ? [["frontend", "Frontend"]] as [ResultTab, string][] : []),
                     ...(demoResult.dashboardProject ? [["dashboard", "Dashboard"]] as [ResultTab, string][] : []),
+                    ...(demoResult.deploymentProject ? [["deploy", "Deploy 🚀"]] as [ResultTab, string][] : []),
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -2306,6 +2309,299 @@ ${demoResult.components.map((c) => `        ├── ${c.name}.tsx`).join("\n")
               )}
 
               
+
+
+              {/* Tab Content: Deploy */}
+              {activeTab === "deploy" && demoResult.deploymentProject && (
+                <div className="space-y-4">
+                  <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/70 p-1 overflow-x-auto">
+                    {[
+                      ["dockerfile", "🐳 Dockerfile"],
+                      ["dockerfileFrontend", "🖥️ Dockerfile FE"],
+                      ["dockerCompose", "🐙 Compose"],
+                      ["flyToml", "🪰 Fly.io"],
+                      ["githubActions", "⚡ CI/CD"],
+                      ["deployScript", "📜 deploy.sh"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setDeployExpandedSection(key)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+                          deployExpandedSection === key
+                            ? "bg-surface-800 text-white shadow-sm"
+                            : "text-surface-400 hover:text-surface-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {deployExpandedSection === "dockerfile" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🐳</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">Dockerfile</h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">Multi-stage Bun</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.deploymentProject!.dockerfile).then(() => {
+                              setDeployCopied("dockerfile");
+                              setTimeout(() => setDeployCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {deployCopied === "dockerfile" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.deploymentProject.dockerfile}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {deployExpandedSection === "dockerfileFrontend" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🖥️</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">Dockerfile.frontend</h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">Vite → nginx</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.deploymentProject!.dockerfileFrontend).then(() => {
+                              setDeployCopied("dockerfileFrontend");
+                              setTimeout(() => setDeployCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {deployCopied === "dockerfileFrontend" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.deploymentProject.dockerfileFrontend}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {deployExpandedSection === "dockerCompose" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🐙</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">docker-compose.prod.yml</h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">Backend • Frontend • Postgres</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.deploymentProject!.dockerCompose).then(() => {
+                              setDeployCopied("dockerCompose");
+                              setTimeout(() => setDeployCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {deployCopied === "dockerCompose" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.deploymentProject.dockerComposeProd}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {deployExpandedSection === "flyToml" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🪰</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">fly.toml</h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">Fly.io Config</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.deploymentProject!.flyToml).then(() => {
+                              setDeployCopied("flyToml");
+                              setTimeout(() => setDeployCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {deployCopied === "flyToml" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.deploymentProject.flyToml}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {deployExpandedSection === "githubActions" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">⚡</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">.github/workflows/deploy.yml</h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">CI/CD Pipeline</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.deploymentProject!.githubActions).then(() => {
+                              setDeployCopied("githubActions");
+                              setTimeout(() => setDeployCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {deployCopied === "githubActions" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.deploymentProject.githubActions}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {deployExpandedSection === "deployScript" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">📜</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">deploy.sh</h3>
+                          <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">Build • Migrate • Deploy</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.deploymentProject!.deployScript).then(() => {
+                              setDeployCopied("deployScript");
+                              setTimeout(() => setDeployCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {deployCopied === "deployScript" ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{demoResult.deploymentProject.deployScript}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-lg">🚀</span>
+                    <div>
+                      <h4 className="text-sm font-semibold text-blue-300">Complete Deployment Configuration</h4>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        Docker • Docker Compose • Fly.io • GitHub Actions CI/CD • deploy.sh —
+                        Ready to deploy with <code className="text-brand-400">./deploy.sh deploy</code>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
 {/* "What's next?" CTA */}
               <div className="rounded-2xl border border-white/10 bg-surface-900/70 p-6 text-center">
                 <h3 className="font-semibold text-lg">
