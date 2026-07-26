@@ -129,7 +129,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows" | "reports" | "permissions" | "notifications" | "docs";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes" | "database" | "backend" | "frontend" | "dashboard" | "deploy" | "workflows" | "reports" | "permissions" | "notifications" | "docs" | "tests";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -210,6 +210,8 @@ function Home() {
   const [notificationsCopied, setNotificationsCopied] = useState<string | null>(null);
   const [docsExpandedSection, setDocsExpandedSection] = useState<string>("openapi");
   const [docsCopied, setDocsCopied] = useState<string | null>(null);
+  const [testsExpandedSection, setTestsExpandedSection] = useState<string>("unit");
+  const [testsCopied, setTestsCopied] = useState<string | null>(null);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -832,6 +834,7 @@ function Home() {
                     ...(demoResult.permissionProject ? [["permissions", "Permissions 🔐"]] as [ResultTab, string][] : []),
                     ...(demoResult.notificationProject ? [["notifications", "Notifications 🔔"]] as [ResultTab, string][] : []),
                     ...(demoResult.documentationProject ? [["docs", "Docs 📚"]] as [ResultTab, string][] : []),
+                    ...(demoResult.testingProject ? [["tests", "Tests 🧪"]] as [ResultTab, string][] : []),
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -3971,6 +3974,210 @@ ${demoResult.components.map((c) => `        ├── ${c.name}.tsx`).join("\n")
                         <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto whitespace-pre-wrap">
                           <code>{(demoResult.documentationProject?.readme || "").length > 8000 ? (demoResult.documentationProject?.readme || "").slice(0, 8000) + "\n\n... (truncated, click Copy for full README)" : (demoResult.documentationProject?.readme || "")}</code>
                         </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab Content: Tests */}
+              {activeTab === "tests" && demoResult.testingProject && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-lg">🧪</span>
+                    <div>
+                      <h4 className="text-sm font-semibold text-violet-300">Testing Suite</h4>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        {demoResult.testingProject.unitTests.length} unit test files &middot; Integration tests &middot; Fixtures &middot; Setup
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-900/70 p-1 overflow-x-auto">
+                    {[
+                      ["unit", "🔬 Unit Tests"],
+                      ["integration", "🔗 Integration"],
+                      ["fixtures", "🏭 Fixtures"],
+                      ["setup", "⚙️ Setup"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setTestsExpandedSection(key)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+                          testsExpandedSection === key
+                            ? "bg-surface-800 text-white shadow-sm"
+                            : "text-surface-400 hover:text-surface-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Unit Tests */}
+                  {testsExpandedSection === "unit" && (
+                    <div className="space-y-3">
+                      {demoResult.testingProject.unitTests.map((file, i) => (
+                        <div key={i} className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">🔬</span>
+                              <h3 className="text-sm font-semibold text-surface-200 font-mono">{file.filename}</h3>
+                              <span className="text-[10px] font-medium text-violet-500/70 uppercase tracking-wider bg-violet-500/10 px-2 py-0.5 rounded">Unit Test</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(file.content).then(() => {
+                                  setTestsCopied(`unit-${i}`);
+                                  setTimeout(() => setTestsCopied(null), 2000);
+                                }).catch(() => {});
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                            >
+                              {testsCopied === `unit-${i}` ? (
+                                <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                              ) : (
+                                <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                              )}
+                            </button>
+                          </div>
+                          <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                            <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                              <code>{file.content.length > 6000 ? file.content.slice(0, 6000) + "\n\n... (truncated, click Copy for full file)" : file.content}</code>
+                            </pre>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Integration Tests */}
+                  {testsExpandedSection === "integration" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🔗</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">integration.test.ts</h3>
+                          <span className="text-[10px] font-medium text-blue-500/70 uppercase tracking-wider bg-blue-500/10 px-2 py-0.5 rounded">Integration</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.testingProject?.integrationTests || "").then(() => {
+                              setTestsCopied("integration");
+                              setTimeout(() => setTestsCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {testsCopied === "integration" ? (
+                            <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                          ) : (
+                            <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                          <code>{(demoResult.testingProject?.integrationTests || "").length > 8000 ? (demoResult.testingProject?.integrationTests || "").slice(0, 8000) + "\n\n... (truncated, click Copy for full file)" : (demoResult.testingProject?.integrationTests || "")}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Test Fixtures */}
+                  {testsExpandedSection === "fixtures" && (
+                    <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">🏭</span>
+                          <h3 className="text-sm font-semibold text-surface-200 font-mono">test-fixtures.ts</h3>
+                          <span className="text-[10px] font-medium text-amber-500/70 uppercase tracking-wider bg-amber-500/10 px-2 py-0.5 rounded">Fixtures</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(demoResult.testingProject?.fixtures || "").then(() => {
+                              setTestsCopied("fixtures");
+                              setTimeout(() => setTestsCopied(null), 2000);
+                            }).catch(() => {});
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                        >
+                          {testsCopied === "fixtures" ? (
+                            <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                          ) : (
+                            <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                        <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto whitespace-pre-wrap">
+                          <code>{(demoResult.testingProject?.fixtures || "").length > 8000 ? (demoResult.testingProject?.fixtures || "").slice(0, 8000) + "\n\n... (truncated, click Copy for full file)" : (demoResult.testingProject?.fixtures || "")}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Test Setup */}
+                  {testsExpandedSection === "setup" && (
+                    <div className="space-y-4">
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">⚙️</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">test-setup.ts</h3>
+                            <span className="text-[10px] font-medium text-emerald-500/70 uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded">Setup</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.testingProject?.testSetup || "").then(() => {
+                                setTestsCopied("setup");
+                                setTimeout(() => setTestsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {testsCopied === "setup" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                          <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto whitespace-pre-wrap">
+                            <code>{(demoResult.testingProject?.testSetup || "").length > 8000 ? (demoResult.testingProject?.testSetup || "").slice(0, 8000) + "\n\n... (truncated, click Copy for full file)" : (demoResult.testingProject?.testSetup || "")}</code>
+                          </pre>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">📋</span>
+                            <h3 className="text-sm font-semibold text-surface-200 font-mono">vitest.config.ts</h3>
+                            <span className="text-[10px] font-medium text-purple-500/70 uppercase tracking-wider bg-purple-500/10 px-2 py-0.5 rounded">Config</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(demoResult.testingProject?.vitestConfig || "").then(() => {
+                                setTestsCopied("vitest");
+                                setTimeout(() => setTestsCopied(null), 2000);
+                              }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                          >
+                            {testsCopied === "vitest" ? (
+                              <><svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied!</>
+                            ) : (
+                              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                          <pre className="p-5 text-xs font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto whitespace-pre-wrap">
+                            <code>{(demoResult.testingProject?.vitestConfig || "").length > 4000 ? (demoResult.testingProject?.vitestConfig || "").slice(0, 4000) + "\n\n... (truncated, click Copy for full config)" : (demoResult.testingProject?.vitestConfig || "")}</code>
+                          </pre>
+                        </div>
                       </div>
                     </div>
                   )}

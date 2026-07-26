@@ -17,6 +17,7 @@ import { generateReports, buildReportRunnerCode, buildScheduledConfigJSON } from
 import { generatePermissions } from "./permission-generator";
 import { generateNotifications } from "./notification-generator";
 import { generateDocumentation } from "./documentation-generator";
+import { generateTests } from "./testing-generator";
 import type { BackendProject } from "./backend-project";
 import type { FrontendProject } from "./frontend-project";
 import type { DashboardProject } from "./dashboard-generator";
@@ -26,8 +27,9 @@ import type { ReportProject } from "./report-generator";
 import type { PermissionProject } from "./permission-generator";
 import type { NotificationProject } from "./notification-generator";
 import type { DocumentationProject } from "./documentation-generator";
+import type { TestingProject } from "./testing-generator";
 
-export type { BackendProject, FrontendProject, DashboardProject, DeploymentProject, WorkflowProject, ReportProject, PermissionProject, NotificationProject, DocumentationProject };
+export type { BackendProject, FrontendProject, DashboardProject, DeploymentProject, WorkflowProject, ReportProject, PermissionProject, NotificationProject, DocumentationProject, TestingProject };
 export { buildReportRunnerCode, buildScheduledConfigJSON };
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -97,6 +99,7 @@ export interface GenerationResult {
   permissionProject?: PermissionProject;
   notificationProject?: NotificationProject;
   documentationProject?: DocumentationProject;
+  testingProject?: TestingProject;
 }
 
 // ── OpenAI generation (primary path) ────────────────────────────────────────
@@ -1870,8 +1873,9 @@ function attachSchemaArtifacts(result: GenerationResult): GenerationResult {
   const permissionProject = generatePermissions(result.entities, result.endpoints, result.domain);
   const notificationProject = generateNotifications(result.entities, result.endpoints, result.domain);
   const documentationProject = generateDocumentation(result.entities, result.endpoints, apiRoutes, result.domain);
+  const testingProject = generateTests(result.entities, result.endpoints, apiRoutes);
 
-  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject, deploymentProject, workflowProject, reportProject, reportRunner, scheduledConfigJson, permissionProject, notificationProject, documentationProject };
+  return { ...result, relationships, sql, erDiagram, apiRoutes, databaseProject, backendProject, frontendProject, dashboardProject, deploymentProject, workflowProject, reportProject, reportRunner, scheduledConfigJson, permissionProject, notificationProject, documentationProject, testingProject };
 }
 
 // ── Main generation function ───────────────────────────────────────────────
