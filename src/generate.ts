@@ -52,6 +52,7 @@ export interface GenerationResult {
   relationships: Relationship[];
   sql: string;
   erDiagram: string;
+  apiRoutes: string;
 }
 
 // ── OpenAI generation (primary path) ────────────────────────────────────────
@@ -168,6 +169,7 @@ async function generateWithOpenAI(input: string): Promise<GenerationResult> {
     relationships: [],
     sql: "",
     erDiagram: "",
+    apiRoutes: "",
   };
 }
 
@@ -969,6 +971,7 @@ function generateWithFallback(input: string): GenerationResult {
     relationships: [],
     sql: "",
     erDiagram: "",
+    apiRoutes: "",
   };
 }
 
@@ -1258,13 +1261,557 @@ export function generateERDiagram(
   return lines.join("\n");
 }
 
-// ── Pipeline: attach relationships, SQL, and ER diagram to a result ───────
+// ── API Routes Generator (Bun/Hono + Zod) ──────────────────────────────────
+
+/**
+ * Simple English pluralization for entity → route segment.
+ */
+function pluralize(word: string): string {
+  const lower = word.toLowerCase();
+  if (/s$/.test(lower) || /x$/.test(lower) || /z$/.test(lower) || /ch$/.test(lower) || /sh$/.test(lower)) {
+    return word + "es";
+  }
+  if (/[^aeiou]y$/i.test(word)) {
+    return word.slice(0, -1) + "ies";
+  }
+  return word + "s";
+}
+
+/**
+ * Maps a GeneratedField type string to a Zod validator expression.
+ */
+function typeToZod(field: GeneratedField): string {
+  const t = field.type.toLowerCase().trim();
+
+  // FK references resolve to UUID
+  if (/^uuid\s*→/.test(t)) return "z.string().uuid()";
+
+  if (t === "uuid") return "z.string().uuid()";
+  if (t === "string") return "z.string()";
+  if (t === "email") return "z.string().email()";
+  if (t === "text") return "z.string()";
+  if (t === "integer" || t === "int") return "z.number().int()";
+  if (t === "number") return "z.number()";
+  if (t === "decimal" || t === "float" || t === "double") return "z.number()";
+  if (t === "boolean" || t === "bool") return "z.boolean()";
+  if (t === "date") return "z.string()";
+  if (t === "datetime" || t === "timestamp") return "z.string()";
+  if (t === "enum" || t.startsWith("enum")) return "z.string()";
+  if (t === "json") return "z.record(z.any())";
+  if (t === "string[]") return "z.array(z.string())";
+  if (t.includes("[]")) return "z.array(z.any())";
+  return "z.string()";
+}
+
+/**
+ * Maps a GeneratedField type to a TypeScript type string for interfaces.
+ */
+function typeToTS(field: GeneratedField): string {
+  const t = field.type.toLowerCase().trim();
+  if (/^uuid\s*→/.test(t)) return "string";
+  if (t === "uuid") return "string";
+  if (t === "string" || t === "email") return "string";
+  if (t === "text") return "string";
+  if (t === "integer" || t === "int" || t === "number") return "number";
+  if (t === "decimal" || t === "float" || t === "double") return "number";
+  if (t === "boolean" || t === "bool") return "boolean";
+  if (t === "date" || t === "datetime" || t === "timestamp") return "string";
+  if (t === "enum" || t.startsWith("enum")) return "string";
+  if (t === "json") return "Record<string, unknown>";
+  if (t === "string[]") return "string[]";
+  if (t.includes("[]")) return "unknown[]";
+  return "string";
+}
+
+/**
+ * Determines which entity an endpoint belongs to by matching path segments.
+ * Returns the entity name and the action type.
+ */
+function classifyEndpoint(
+  ep: GeneratedEndpoint,
+  entities: GeneratedEntity[]
+): { entityName: string | null; isCrud: boolean; crudAction: string | null; isDomainSpecific: boolean } {
+  const path = ep.path.toLowerCase();
+  const parts = path.replace(/^\/api\//, "").split("/").filter(Boolean);
+  const resource = parts[0] || "";
+
+  // Find matching entity by pluralized name
+  let matchedEntity: string | null = null;
+  for (const entity of entities) {
+    const plural = pluralize(entity.name).toLowerCase();
+    if (resource === plural) {
+      matchedEntity = entity.name;
+      break;
+    }
+    // Also check singular
+    if (resource === entity.name.toLowerCase()) {
+      matchedEntity = entity.name;
+      break;
+    }
+  }
+
+  if (!matchedEntity) return { entityName: null, isCrud: false, crudAction: null, isDomainSpecific: false };
+
+  // Determine if CRUD or domain-specific
+  const isList = parts.length === 1 && ep.method === "GET";
+  const isGetById = parts.length === 2 && parts[1] === ":id" && ep.method === "GET";
+  const isCreate = parts.length === 1 && ep.method === "POST";
+  const isUpdate = parts.length === 2 && parts[1] === ":id" && (ep.method === "PATCH" || ep.method === "PUT");
+  const isDelete = parts.length === 2 && parts[1] === ":id" && ep.method === "DELETE";
+
+  if (isList) return { entityName: matchedEntity, isCrud: true, crudAction: "list", isDomainSpecific: false };
+  if (isGetById) return { entityName: matchedEntity, isCrud: true, crudAction: "get", isDomainSpecific: false };
+  if (isCreate) return { entityName: matchedEntity, isCrud: true, crudAction: "create", isDomainSpecific: false };
+  if (isUpdate) return { entityName: matchedEntity, isCrud: true, crudAction: "update", isDomainSpecific: false };
+  if (isDelete) return { entityName: matchedEntity, isCrud: true, crudAction: "delete", isDomainSpecific: false };
+
+  // Domain-specific: has an extra segment (action) after :id
+  if (parts.length >= 3 && parts[1] === ":id") {
+    return { entityName: matchedEntity, isCrud: false, crudAction: null, isDomainSpecific: true };
+  }
+
+  return { entityName: matchedEntity, isCrud: false, crudAction: null, isDomainSpecific: true };
+}
+
+/**
+ * Generates a complete Bun/Hono API routes file with TypeScript interfaces,
+ * Zod validation schemas, repository pattern, and full CRUD + domain routes.
+ */
+export function generateAPIRoutes(
+  entities: GeneratedEntity[],
+  endpoints: GeneratedEndpoint[],
+  _relationships: Relationship[]
+): string {
+  const lines: string[] = [];
+
+  // ── Header ──
+  lines.push(`/**`);
+  lines.push(` * Generated API Routes — ${entities.length > 0 ? entities.map(e => e.name).join(", ") : "Custom"} Domain`);
+  lines.push(` * `);
+  lines.push(` * Framework: Bun + Hono`);
+  lines.push(` * Validation: Zod`);
+  lines.push(` * Pattern: Repository + Router`);
+  lines.push(` * `);
+  lines.push(` * Generated by Genesis Platform ASGP Engine`);
+  lines.push(` */`);
+  lines.push(``);
+  lines.push(`import { Hono } from "hono";`);
+  lines.push(`import { z } from "zod";`);
+  lines.push(`import { zValidator } from "@hono/zod-validator";`);
+  lines.push(``);
+  lines.push(`// ── Database client stub ─────────────────────────────────────────────────`);
+  lines.push(`// Replace with your actual database client (Drizzle, Prisma, Kysely, etc.)`);
+  lines.push(`const db = {`);
+  lines.push(`  query: async (sql: string, params?: unknown[]) => {`);
+  lines.push(`    // In production: pool.query(sql, params)`);
+  lines.push(`    console.debug("[db] query:", sql, params);`);
+  lines.push(`    return { rows: [] as Record<string, unknown>[] };`);
+  lines.push(`  },`);
+  lines.push(`  queryOne: async (sql: string, params?: unknown[]) => {`);
+  lines.push(`    const result = await db.query(sql, params);`);
+  lines.push(`    return result.rows[0] ?? null;`);
+  lines.push(`  },`);
+  lines.push(`  execute: async (sql: string, params?: unknown[]) => {`);
+  lines.push(`    await db.query(sql, params);`);
+  lines.push(`  },`);
+  lines.push(`};`);
+  lines.push(``);
+
+  // ── TypeScript Interfaces ──
+  lines.push(`// ── TypeScript Interfaces ─────────────────────────────────────────────────`);
+  for (const entity of entities) {
+    lines.push(`interface ${entity.name} {`);
+    for (const field of entity.fields) {
+      const optional = field.required ? "" : "?";
+      lines.push(`  ${field.name}${optional}: ${typeToTS(field)};`);
+    }
+    lines.push(`  createdAt: string;`);
+    lines.push(`  updatedAt: string;`);
+    lines.push(`}`);
+    lines.push(``);
+  }
+
+  // ── Zod Schemas ──
+  lines.push(`// ── Zod Validation Schemas ────────────────────────────────────────────────`);
+  for (const entity of entities) {
+    const nonPkFields = entity.fields.filter((f) => f.name !== "id" && f.name !== "createdAt" && f.name !== "created_at" && f.name !== "updatedAt" && f.name !== "updated_at");
+
+    // Create schema: all required non-PK fields
+    const createFields: string[] = [];
+    for (const field of nonPkFields) {
+      const zod = typeToZod(field);
+      const expr = field.required ? zod : `${zod}.optional()`;
+      createFields.push(`  ${field.name}: ${expr},`);
+    }
+    if (createFields.length > 0) {
+      lines.push(`const create${entity.name}Schema = z.object({`);
+      lines.push(...createFields);
+      lines.push(`});`);
+      lines.push(``);
+    }
+
+    // Update schema: all non-PK fields optional
+    const updateFields: string[] = [];
+    for (const field of nonPkFields) {
+      updateFields.push(`  ${field.name}: ${typeToZod(field)}.optional(),`);
+    }
+    if (updateFields.length > 0) {
+      lines.push(`const update${entity.name}Schema = z.object({`);
+      lines.push(...updateFields);
+      lines.push(`});`);
+      lines.push(``);
+    }
+  }
+
+  // ── Repository Layer ──
+  lines.push(`// ── Repository Layer ──────────────────────────────────────────────────────`);
+  lines.push(`// Each repository encapsulates data access for one entity using`);
+  lines.push(`// parameterized SQL queries referencing the generated tables.`);
+  lines.push(``);
+
+  for (const entity of entities) {
+    const tableName = entity.name.toLowerCase();
+    const idField = entity.fields.find(f => f.name === "id") ? "id" : "id";
+    const columnNames = entity.fields.map(f => f.name);
+    const insertColumns = columnNames.filter(n => n !== "id" && n !== "createdAt" && n !== "created_at" && n !== "updatedAt" && n !== "updated_at");
+
+    lines.push(`const ${entity.name.toLowerCase()}Repository = {`);
+    lines.push(`  findAll: async (params?: { limit?: number; offset?: number }) => {`);
+    lines.push(`    const limit = params?.limit ?? 50;`);
+    lines.push(`    const offset = params?.offset ?? 0;`);
+    lines.push(`    const result = await db.query(`);
+    lines.push(`      \`SELECT * FROM ${tableName} ORDER BY created_at DESC LIMIT $\{limit} OFFSET $\{offset}\`,`);
+    lines.push(`      [limit, offset]`);
+    lines.push(`    );`);
+    lines.push(`    return result.rows as ${entity.name}[];`);
+    lines.push(`  },`);
+    lines.push(``);
+    lines.push(`  findById: async (id: string) => {`);
+    lines.push(`    const result = await db.queryOne(`);
+    lines.push(`      \`SELECT * FROM ${tableName} WHERE ${idField} = $1\`,`);
+    lines.push(`      [id]`);
+    lines.push(`    );`);
+    lines.push(`    return result as ${entity.name} | null;`);
+    lines.push(`  },`);
+    lines.push(``);
+
+    if (insertColumns.length > 0) {
+      lines.push(`  create: async (data: Omit<${entity.name}, "id" | "createdAt" | "updatedAt">) => {`);
+      lines.push(`    const columns = [${insertColumns.map(c => `"${c}"`).join(", ")}];`);
+      lines.push(`    const values = [${insertColumns.map(c => `data.${c}`).join(", ")}];`);
+      lines.push(`    const ph = values.map((_, i) => \`$\${i + 1}\`).join(", ");`);
+      lines.push(`    const result = await db.queryOne(`);
+      lines.push(`      \`INSERT INTO ${tableName} ($\{columns.join(", ")}) VALUES ($\{ph}) RETURNING *\`,`);
+      lines.push(`      values`);
+      lines.push(`    );`);
+      lines.push(`    return result as ${entity.name};`);
+      lines.push(`  },`);
+      lines.push(``);
+    }
+
+    if (insertColumns.length > 0) {
+      lines.push(`  update: async (id: string, data: Partial<Omit<${entity.name}, "id" | "createdAt" | "updatedAt">>) => {`);
+      lines.push(`    const keys = Object.keys(data) as (keyof typeof data)[];`);
+      lines.push(`    if (keys.length === 0) return null;`);
+      lines.push(`    const sets = keys.map((k, i) => \`"$\{String(k)}" = $\${i + 2}\`).join(", ");`);
+      lines.push(`    const values = [id, ...keys.map(k => data[k])];`);
+      lines.push(`    const result = await db.queryOne(`);
+      lines.push(`      \`UPDATE ${tableName} SET $\{sets}, updated_at = NOW() WHERE ${idField} = $1 RETURNING *\`,`);
+      lines.push(`      values`);
+      lines.push(`    );`);
+      lines.push(`    return result as ${entity.name} | null;`);
+      lines.push(`  },`);
+      lines.push(``);
+    }
+
+    lines.push(`  delete: async (id: string) => {`);
+    lines.push(`    const result = await db.queryOne(`);
+    lines.push(`      \`DELETE FROM ${tableName} WHERE ${idField} = $1 RETURNING ${idField}\`,`);
+    lines.push(`      [id]`);
+    lines.push(`    );`);
+    lines.push(`    return result !== null;`);
+    lines.push(`  },`);
+    lines.push(`};`);
+    lines.push(``);
+  }
+
+  // ── Router ──
+  lines.push(`// ── Router ────────────────────────────────────────────────────────────────`);
+  lines.push(`const router = new Hono();`);
+  lines.push(``);
+
+  // Group endpoints by entity
+  for (const entity of entities) {
+    const entityName = entity.name;
+    const plural = pluralize(entityName);
+    const repoVar = `${entityName.toLowerCase()}Repository`;
+    const hasCreateSchema = entity.fields.some(f => f.name !== "id" && f.name !== "createdAt" && f.name !== "created_at" && f.name !== "updatedAt" && f.name !== "updated_at");
+    const hasUpdateSchema = hasCreateSchema;
+
+    lines.push(`// ── ${entityName} routes ──`);
+
+    // Find endpoints for this entity
+    const entityEndpoints = endpoints.filter(ep => {
+      const classification = classifyEndpoint(ep, entities);
+      return classification.entityName === entityName;
+    });
+
+    // Generate CRUD routes if endpoints exist
+    const hasListEp = entityEndpoints.some(ep => classifyEndpoint(ep, entities).crudAction === "list");
+    const hasGetEp = entityEndpoints.some(ep => classifyEndpoint(ep, entities).crudAction === "get");
+    const hasCreateEp = entityEndpoints.some(ep => classifyEndpoint(ep, entities).crudAction === "create");
+    const hasUpdateEp = entityEndpoints.some(ep => classifyEndpoint(ep, entities).crudAction === "update");
+    const hasDeleteEp = entityEndpoints.some(ep => classifyEndpoint(ep, entities).crudAction === "delete");
+
+    // LIST
+    if (hasListEp) {
+      lines.push(`// GET /api/${plural.toLowerCase()} — List all ${plural.toLowerCase()}`);
+      lines.push(`router.get("/api/${plural.toLowerCase()}", async (c) => {`);
+      lines.push(`  try {`);
+      lines.push(`    const limit = parseInt(c.req.query("limit") ?? "50", 10);`);
+      lines.push(`    const offset = parseInt(c.req.query("offset") ?? "0", 10);`);
+      lines.push(`    const items = await ${repoVar}.findAll({ limit, offset });`);
+      lines.push(`    return c.json({ data: items, count: items.length, limit, offset });`);
+      lines.push(`  } catch (error) {`);
+      lines.push(`    console.error("[${plural}] List error:", error);`);
+      lines.push(`    return c.json({ error: "Failed to fetch ${plural.toLowerCase()}" }, 500);`);
+      lines.push(`  }`);
+      lines.push(`});`);
+      lines.push(``);
+    }
+
+    // GET BY ID
+    if (hasGetEp) {
+      lines.push(`// GET /api/${plural.toLowerCase()}/:id — Get ${entityName.toLowerCase()} by ID`);
+      lines.push(`router.get("/api/${plural.toLowerCase()}/:id", async (c) => {`);
+      lines.push(`  try {`);
+      lines.push(`    const id = c.req.param("id");`);
+      lines.push(`    if (!id || typeof id !== "string") {`);
+      lines.push(`      return c.json({ error: "Invalid ID parameter" }, 400);`);
+      lines.push(`    }`);
+      lines.push(`    const item = await ${repoVar}.findById(id);`);
+      lines.push(`    if (!item) {`);
+      lines.push(`      return c.json({ error: "${entityName} not found" }, 404);`);
+      lines.push(`    }`);
+      lines.push(`    return c.json({ data: item });`);
+      lines.push(`  } catch (error) {`);
+      lines.push(`    console.error("[${plural}] Get error:", error);`);
+      lines.push(`    return c.json({ error: "Failed to fetch ${entityName.toLowerCase()}" }, 500);`);
+      lines.push(`  }`);
+      lines.push(`});`);
+      lines.push(``);
+    }
+
+    // CREATE
+    if (hasCreateEp && hasCreateSchema) {
+      lines.push(`// POST /api/${plural.toLowerCase()} — Create a new ${entityName.toLowerCase()}`);
+      lines.push(`router.post("/api/${plural.toLowerCase()}", zValidator("json", create${entityName}Schema), async (c) => {`);
+      lines.push(`  try {`);
+      lines.push(`    const data = c.req.valid("json");`);
+      lines.push(`    const item = await ${repoVar}.create(data as Omit<${entityName}, "id" | "createdAt" | "updatedAt">);`);
+      lines.push(`    return c.json({ data: item }, 201);`);
+      lines.push(`  } catch (error) {`);
+      lines.push(`    console.error("[${plural}] Create error:", error);`);
+      lines.push(`    return c.json({ error: "Failed to create ${entityName.toLowerCase()}" }, 500);`);
+      lines.push(`  }`);
+      lines.push(`});`);
+      lines.push(``);
+    } else if (hasCreateEp) {
+      lines.push(`// POST /api/${plural.toLowerCase()} — Create a new ${entityName.toLowerCase()}`);
+      lines.push(`router.post("/api/${plural.toLowerCase()}", async (c) => {`);
+      lines.push(`  try {`);
+      lines.push(`    const data = await c.req.json();`);
+      lines.push(`    const item = await ${repoVar}.create(data as Omit<${entityName}, "id" | "createdAt" | "updatedAt">);`);
+      lines.push(`    return c.json({ data: item }, 201);`);
+      lines.push(`  } catch (error) {`);
+      lines.push(`    console.error("[${plural}] Create error:", error);`);
+      lines.push(`    return c.json({ error: "Failed to create ${entityName.toLowerCase()}" }, 500);`);
+      lines.push(`  }`);
+      lines.push(`});`);
+      lines.push(``);
+    }
+
+    // UPDATE
+    if (hasUpdateEp && hasUpdateSchema) {
+      lines.push(`// PATCH /api/${plural.toLowerCase()}/:id — Update ${entityName.toLowerCase()}`);
+      lines.push(`router.patch("/api/${plural.toLowerCase()}/:id", zValidator("json", update${entityName}Schema), async (c) => {`);
+      lines.push(`  try {`);
+      lines.push(`    const id = c.req.param("id");`);
+      lines.push(`    const data = c.req.valid("json");`);
+      lines.push(`    if (!id || typeof id !== "string") {`);
+      lines.push(`      return c.json({ error: "Invalid ID parameter" }, 400);`);
+      lines.push(`    }`);
+      lines.push(`    // Verify the record exists`);
+      lines.push(`    const existing = await ${repoVar}.findById(id);`);
+      lines.push(`    if (!existing) {`);
+      lines.push(`      return c.json({ error: "${entityName} not found" }, 404);`);
+      lines.push(`    }`);
+      lines.push(`    const item = await ${repoVar}.update(id, data);`);
+      lines.push(`    return c.json({ data: item });`);
+      lines.push(`  } catch (error) {`);
+      lines.push(`    console.error("[${plural}] Update error:", error);`);
+      lines.push(`    return c.json({ error: "Failed to update ${entityName.toLowerCase()}" }, 500);`);
+      lines.push(`  }`);
+      lines.push(`});`);
+      lines.push(``);
+    } else if (hasUpdateEp) {
+      lines.push(`// PATCH /api/${plural.toLowerCase()}/:id — Update ${entityName.toLowerCase()}`);
+      lines.push(`router.patch("/api/${plural.toLowerCase()}/:id", async (c) => {`);
+      lines.push(`  try {`);
+      lines.push(`    const id = c.req.param("id");`);
+      lines.push(`    const data = await c.req.json();`);
+      lines.push(`    if (!id || typeof id !== "string") {`);
+      lines.push(`      return c.json({ error: "Invalid ID parameter" }, 400);`);
+      lines.push(`    }`);
+      lines.push(`    const existing = await ${repoVar}.findById(id);`);
+      lines.push(`    if (!existing) {`);
+      lines.push(`      return c.json({ error: "${entityName} not found" }, 404);`);
+      lines.push(`    }`);
+      lines.push(`    const item = await ${repoVar}.update(id, data);`);
+      lines.push(`    return c.json({ data: item });`);
+      lines.push(`  } catch (error) {`);
+      lines.push(`    console.error("[${plural}] Update error:", error);`);
+      lines.push(`    return c.json({ error: "Failed to update ${entityName.toLowerCase()}" }, 500);`);
+      lines.push(`  }`);
+      lines.push(`});`);
+      lines.push(``);
+    }
+
+    // DELETE
+    if (hasDeleteEp) {
+      lines.push(`// DELETE /api/${plural.toLowerCase()}/:id — Delete ${entityName.toLowerCase()}`);
+      lines.push(`router.delete("/api/${plural.toLowerCase()}/:id", async (c) => {`);
+      lines.push(`  try {`);
+      lines.push(`    const id = c.req.param("id");`);
+      lines.push(`    if (!id || typeof id !== "string") {`);
+      lines.push(`      return c.json({ error: "Invalid ID parameter" }, 400);`);
+      lines.push(`    }`);
+      lines.push(`    const existing = await ${repoVar}.findById(id);`);
+      lines.push(`    if (!existing) {`);
+      lines.push(`      return c.json({ error: "${entityName} not found" }, 404);`);
+      lines.push(`    }`);
+      lines.push(`    await ${repoVar}.delete(id);`);
+      lines.push(`    return c.json({ success: true }, 200);`);
+      lines.push(`  } catch (error) {`);
+      lines.push(`    console.error("[${plural}] Delete error:", error);`);
+      lines.push(`    return c.json({ error: "Failed to delete ${entityName.toLowerCase()}" }, 500);`);
+      lines.push(`  }`);
+      lines.push(`});`);
+      lines.push(``);
+    }
+
+    // Domain-specific endpoints
+    for (const ep of entityEndpoints) {
+      const classification = classifyEndpoint(ep, entities);
+      if (!classification.isDomainSpecific) continue;
+
+      const pathParts = ep.path.replace(/^\/api\//, "").split("/").filter(Boolean);
+      const action = pathParts.length >= 3 ? pathParts[pathParts.length - 1] : ep.description.replace(/\s+/g, "-").toLowerCase();
+      const pascalAction = action
+        .split(/[-_]/)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join("");
+
+      lines.push(`// ${ep.method} ${ep.path} — ${ep.description}`);
+      lines.push(`router.${ep.method.toLowerCase()}("${ep.path}", async (c) => {`);
+      lines.push(`  try {`);
+      lines.push(`    const id = c.req.param("id");`);
+      lines.push(`    if (!id || typeof id !== "string") {`);
+      lines.push(`      return c.json({ error: "Invalid ID parameter" }, 400);`);
+      lines.push(`    }`);
+      lines.push(`    `);
+      lines.push(`    const item = await ${repoVar}.findById(id);`);
+      lines.push(`    if (!item) {`);
+      lines.push(`      return c.json({ error: "${entityName} not found" }, 404);`);
+      lines.push(`    }`);
+      lines.push(`    `);
+      lines.push(`    // Domain-specific logic for: ${ep.description}`);
+      if (ep.method === "POST" || ep.method === "PATCH" || ep.method === "PUT") {
+        lines.push(`    const body = await c.req.json().catch(() => ({}));`);
+        lines.push(`    await db.execute(`);
+        lines.push(`      \`UPDATE ${entityName.toLowerCase()} SET status = $1, updated_at = NOW() WHERE id = $2\`,`);
+        lines.push(`      ["${action}", id]`);
+        lines.push(`    );`);
+      } else {
+        lines.push(`    // Execute the domain operation`);
+        lines.push(`    await db.execute(`);
+        lines.push(`      \`SELECT handle_${action}($1)\`,`);
+        lines.push(`      [id]`);
+        lines.push(`    );`);
+      }
+      lines.push(`    `);
+      lines.push(`    const updated = await ${repoVar}.findById(id);`);
+      lines.push(`    return c.json({ data: updated });`);
+      lines.push(`  } catch (error) {`);
+      lines.push(`    console.error("[${plural}] ${pascalAction} error:", error);`);
+      lines.push(`    return c.json({ error: "Failed to process ${action} for ${entityName.toLowerCase()}" }, 500);`);
+      lines.push(`  }`);
+      lines.push(`});`);
+      lines.push(``);
+    }
+  }
+
+  // Non-entity endpoints (dashboard, auth, etc.)
+  const orphanEndpoints = endpoints.filter(ep => {
+    const classification = classifyEndpoint(ep, entities);
+    return classification.entityName === null;
+  });
+
+  if (orphanEndpoints.length > 0) {
+    lines.push(`// ── Additional Domain Routes ──`);
+    for (const ep of orphanEndpoints) {
+      const cleanPath = ep.path.replace(/^\/api\//, "");
+      const routePath = ep.path.startsWith("/api/") ? ep.path : `/api/${cleanPath.replace(/^\//, "")}`;
+      const handlerName = cleanPath.replace(/[^a-zA-Z0-9]/g, "_");
+
+      lines.push(`// ${ep.method} ${routePath} — ${ep.description}`);
+      lines.push(`router.${ep.method.toLowerCase()}("${routePath}", async (c) => {`);
+      lines.push(`  try {`);
+      if (ep.method === "GET") {
+        lines.push(`    // ${ep.description}`);
+        lines.push(`    const result = await db.query(\`SELECT * FROM ${handlerName}\`);`);
+        lines.push(`    return c.json({ data: result.rows });`);
+      } else if (ep.method === "POST") {
+        lines.push(`    const body = await c.req.json();`);
+        lines.push(`    // ${ep.description}`);
+        lines.push(`    return c.json({ data: body, message: "${ep.description}" }, 201);`);
+      } else {
+        lines.push(`    // ${ep.description}`);
+        lines.push(`    return c.json({ success: true });`);
+      }
+      lines.push(`  } catch (error) {`);
+      lines.push(`    console.error("[${handlerName}] Error:", error);`);
+      lines.push(`    return c.json({ error: "Operation failed" }, 500);`);
+      lines.push(`  }`);
+      lines.push(`});`);
+      lines.push(``);
+    }
+  }
+
+  // ── Health check ──
+  lines.push(`// ── Health Check ──────────────────────────────────────────────────────────`);
+  lines.push(`router.get("/api/health", (c) => {`);
+  lines.push(`  return c.json({ status: "ok", timestamp: new Date().toISOString() });`);
+  lines.push(`});`);
+  lines.push(``);
+
+  // ── Export ──
+  lines.push(`export default router;`);
+  lines.push(``);
+
+  return lines.join("\n");
+}
 
 function attachSchemaArtifacts(result: GenerationResult): GenerationResult {
   const relationships = inferRelationships(result.entities);
   const sql = generateSQL(result.entities, relationships);
   const erDiagram = generateERDiagram(result.entities, relationships);
-  return { ...result, relationships, sql, erDiagram };
+  const apiRoutes = generateAPIRoutes(
+    result.entities,
+    result.endpoints,
+    relationships
+  );
+  return { ...result, relationships, sql, erDiagram, apiRoutes };
 }
 
 // ── Main generation function ───────────────────────────────────────────────

@@ -118,7 +118,7 @@ const EXAMPLE_PROMPTS = [
 
 // ── Tab types for results ─────────────────────────────────────────────────
 
-type ResultTab = "entities" | "endpoints" | "components" | "schema";
+type ResultTab = "entities" | "endpoints" | "components" | "schema" | "apiroutes";
 
 // ── Animated typing placeholder ───────────────────────────────────────────
 
@@ -178,6 +178,7 @@ function Home() {
   const [waitlistMessage, setWaitlistMessage] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [sqlCopied, setSqlCopied] = useState(false);
+  const [apiRoutesCopied, setApiRoutesCopied] = useState(false);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -716,6 +717,7 @@ function Home() {
                     ["endpoints", `API Endpoints (${demoResult.endpoints.length})`],
                     ["components", `Components (${demoResult.components.length})`],
                     ["schema", "Database Schema"],
+                    ...(demoResult.apiRoutes ? [["apiroutes", "API Routes"]] as [ResultTab, string][] : []),
                   ] as [ResultTab, string][]
                 ).map(([tab, label]) => (
                   <button
@@ -1030,6 +1032,52 @@ function Home() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Tab Content: API Routes */}
+              {activeTab === "apiroutes" && demoResult.apiRoutes && (
+                <div className="rounded-xl border border-white/5 bg-surface-900/50 overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-sm font-semibold text-surface-200">
+                        Generated API Routes
+                      </h3>
+                      <span className="text-[10px] font-medium text-surface-600 uppercase tracking-wider">
+                        Bun + Hono + Zod
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(demoResult.apiRoutes).then(() => {
+                          setApiRoutesCopied(true);
+                          setTimeout(() => setApiRoutesCopied(false), 2000);
+                        }).catch(() => {});
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-surface-800 px-3 py-1.5 text-xs font-medium text-surface-300 transition-all hover:bg-surface-700 hover:text-white"
+                    >
+                      {apiRoutesCopied ? (
+                        <>
+                          <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy Code
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <pre className="p-5 text-sm font-mono leading-relaxed text-surface-200 bg-surface-950/70 overflow-x-auto">
+                      <code>{demoResult.apiRoutes}</code>
+                    </pre>
+                  </div>
                 </div>
               )}
 
