@@ -11,6 +11,7 @@ import {
   addToWaitlist,
   type GenerationResult,
 } from "~/generate";
+import { generateProjectZip } from "~/zip-generator";
 
 // ── Server Functions ───────────────────────────────────────────────────────
 
@@ -34,6 +35,16 @@ const submitWaitlist = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     return await addToWaitlist(data.email);
+  });
+
+const downloadZip = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    if (typeof data !== "object" || data === null)
+      throw new Error("Invalid request");
+    return data as GenerationResult;
+  })
+  .handler(async ({ data }) => {
+    return await generateProjectZip(data);
   });
 
 // ── Route definition ──────────────────────────────────────────────────────
@@ -185,6 +196,7 @@ function Home() {
   const [frontendExpandedSection, setFrontendExpandedSection] = useState<string>("structure");
   const [backendCopied, setBackendCopied] = useState<string | null>(null);
   const [frontendCopied, setFrontendCopied] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const demoRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -281,6 +293,38 @@ function Home() {
     } catch {
       setWaitlistStatus("error");
       setWaitlistMessage("Something went wrong. Please try again.");
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!demoResult || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const base64 = await downloadZip({ data: demoResult });
+      // Convert base64 to blob and trigger download
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "application/zip" });
+      const url = URL.createObjectURL(blob);
+      const domainSlug = demoResult.domain
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${domainSlug}-project.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -713,6 +757,47 @@ function Home() {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Download Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-emerald-400 hover:glow disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDownloading ? (
+                    <>
+                      <svg
+                        className="h-4 w-4 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                      Generating ZIP...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Download Full Project
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Tabs */}

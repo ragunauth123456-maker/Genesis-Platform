@@ -227,7 +227,7 @@ function generateDataDisplayComponent(comp: GeneratedComponent, entities: Genera
     const mockData = generateMockData(entityForComponent, 6);
     body = generateCardGrid(comp.name, entityForComponent, mockVar, mockData);
   } else {
-    body = generateGenericCard(comp);
+    body = generateGenericComponent(comp);
   }
 
   const imports = entityForComponent
