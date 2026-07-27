@@ -779,43 +779,63 @@ function Home() {
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
             What early <span className="gradient-text">users</span> are saying
           </h2>
+          <p className="mt-3 text-sm text-surface-500 italic">
+            Real testimonials coming soon — want to be featured?{" "}
+            <a href="#demo" className="text-brand-400 underline hover:text-brand-300 transition-colors">
+              Try the demo
+            </a>{" "}
+            and share your results.
+          </p>
 
-          <div className="mt-10 grid gap-6 sm:grid-cols-2">
+          {/* Metrics Bar */}
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
-                quote: "Generated a complete hotel booking system in 90 seconds. Unbelievable.",
-                author: "Early Access User",
-                role: "Hospitality Tech",
+                value: "14",
+                label: "Generators",
+                icon: (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                ),
               },
               {
-                quote: "We built our entire clinic management platform from a single prompt.",
-                author: "Healthcare Founder",
-                role: "Medical Practice",
+                value: "16",
+                label: "Output Tabs",
+                icon: (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                ),
               },
-            ].map((testimonial, i) => (
+              {
+                value: "TS",
+                label: "TypeScript · PostgreSQL · React · Docker",
+                icon: (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                ),
+              },
+              {
+                value: "ZIP",
+                label: "Download as ZIP — you own the code",
+                icon: (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                ),
+              },
+            ].map((metric, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-white/5 bg-surface-900/50 p-6 text-left"
+                className="rounded-2xl border border-white/5 bg-surface-900/50 p-6 text-center transition-all hover:border-white/10 hover:bg-surface-900"
               >
-                <div className="mb-4 flex gap-0.5">
-                  {[...Array(5)].map((_, j) => (
-                    <svg key={j} className="h-4 w-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
+                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-400">
+                  {metric.icon}
                 </div>
-                <blockquote className="text-surface-200 text-sm leading-relaxed italic">
-                  "{testimonial.quote}"
-                </blockquote>
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-500/10 text-brand-400 text-xs font-bold">
-                    {testimonial.author.split(" ").map(n => n[0]).join("")}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-surface-300">{testimonial.author}</p>
-                    <p className="text-xs text-surface-500">{testimonial.role}</p>
-                  </div>
-                </div>
+                <div className="text-2xl font-extrabold text-white mb-1">{metric.value}</div>
+                <div className="text-xs text-surface-400 leading-relaxed">{metric.label}</div>
               </div>
             ))}
           </div>
